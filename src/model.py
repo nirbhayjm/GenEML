@@ -6,9 +6,14 @@ An online multi-label learning model.
 '''
 
 import numpy as np
+from numpy import linalg
 import scipy.sparse as ssp
+from scipy.sparse import linalg as sp_linalg
 import sklearn
 from sklearn.base import BaseEstimator, TransformerMixin
+
+import time
+from itertools import cycle
 
 floatX = np.float32
 EPS = 1e-8
@@ -96,6 +101,8 @@ class OnlineMF(BaseEstimator, TransformerMixin):
             np.random.seed(self.random_state)
         elif self.random_state is not None:
             np.random.setstate(self.random_state)
+        elif self.random_state is None:
+            self.random_state = 0
 
         # Preprocess train and optional test data
         X_user, Y_label = preprocess(X_user, Y_label)
@@ -103,8 +110,8 @@ class OnlineMF(BaseEstimator, TransformerMixin):
             X_user_test, Y_label_test = preprocess(X_user_test, Y_label_test)
 
         # Get input dimensions
-        n_users,n_items = Y.shape
-        n_user_feats = X.shape[1]
+        n_users,n_items = Y_label.shape
+        n_user_feats = X_user.shape[1]
 
         # Preset learning rates at every iteration
         self.lr = self.lr_alpha_0*((1.0 + np.arange(self.max_iter))**(-self.lr_tau))
@@ -112,10 +119,12 @@ class OnlineMF(BaseEstimator, TransformerMixin):
         # Initial dataset shuffle
         if self.shuffle_minibatches:
             perm = np.random.permutation(n_users)
-            X = X[perm]
-            F = F[perm]
+            X_user = X_user[perm]
+            Y_label = Y_label[perm]
 
         self._init_params(n_user_feats,n_items)
+
+        self._update(Y_label, X_user, Y_label_test, X_user_test)
 
     def _init_params(n_user_feats,n_items):
         '''
@@ -170,5 +179,133 @@ class OnlineMF(BaseEstimator, TransformerMixin):
             self.theta_A[i] = self.lam_beta*np.eye(self.n_components)
         return
 
-    def function():
+    def _update(Y, X, Y_test, X_test):
+        '''
+        Model training and evaluation on test set
+
+        '''
+
+        assert ssp.issparse(Y)
+        assert Y.getformat() == 'csr'
+        n_users = Y.shape[0]
+        n_users_batch = self.batch_size
+
+        if self.verbose:
+            print "Total users:",n_users
+            print "Batch size:",n_users_batch
+            print "Iterations per epoch:",n_users//n_users_batch
+
+        start_epoch_t,start_t = time.time(),time.time()
+        user_t,item_t,user_feat_t,iterTime = 0.,0.,0.,0.
+        expo_t = 0.
+        train_prec,test_prec = (0.,0.,0.),(0.,0.,0.)
+        delta_expo,delta_user,delta_item = 0.0,0.0,0.0
+
+        def _batch_generator(n_users,bsize):
+            start_idx = range(0, n_users, bsize)
+            end_idx = start_idx[1:] #+ [n_users]
+            while True:
+                for lo,hi in zip(start_idx[:-1],end_idx):
+                    yield lo,hi
+
+        range_generator = _batch_generator(n_users,n_users_batch)
+
+        for i in xrange(self.max_iter):
+            # Compute event flags
+            display_flag = (i+1)%self.display_interval == 0
+            test_flag = (i+1)%self.test_interval == 0 and X_test is not None
+            end_epoch_flag = i%(n_users//n_users_batch) == 0
+            save_flag = i%(self.save_interval) == 0 and self.save_params
+            epoch_idx = i//(n_users//n_users_batch)
+
+            # Reshuffle minibaches at the end of every epoch
+            if end_epoch_flag and self.shuffle_minibatches and i != 0:
+                if self.verbose:
+                    print "\nReshuffling data after epoch!\t",
+                shuffle(Y,X,random_state=self.random_state+i)
+
+            # Save model parameters
+            if save_flag and i>0:
+                self._save_params(i) # Params saving per iteration i
+
+            # Get minibatch from range generator
+            lo,hi = range_generator.next()
+
+            Yb = Y[lo:hi]
+            # label_mask = None
+            # if self.label_hide:
+            #     # print "Hiding labels with dropout %f"%(self.label_dropout)
+            #     Yb, label_mask = hide_labels(Yb,self.label_dropout)
+            #     # print "Done!"
+            YbT = Yb.T.tocsr()
+            Xb = X[lo:hi]
+            XbT = Xb.T #.tocsr()
+
+            # Time keeper
+            if i>0:
+                iterTime = time.time() - start_t
+                start_t = time.time()
+                self.iterTimes[i] = np.array((iterTime,)+train_prec+test_prec)
+
+            # Display per-iteration information
+            if end_epoch_flag and self.verbose:
+                print('\nEpoch time=%.2f'% (time.time() - start_epoch_t))                     
+                start_epoch_t = _writeline_and_time('\nEPOCH #%d\n' % epoch_idx)
+            
+            if display_flag and self.verbose:
+                # start_t = _writeline_and_time('\rITERATION #%d Gamma:%.4g User:%.2fs Item:%.2fs W:%.2fs Expo:%.2f total:%.3fs' % \
+                #             (i,self.lr[i],user_t,item_t,user_feat_t,expo_t,iterTime))
+                start_t = _writeline_and_time('\rITERATION #%d Gamma:%.4g Time:%.3fs  D_expo:%f' % \
+                            (i,self.lr[i],iterTime,delta_expo))
+
+            #=== Perform parameter updates
+            user_t,item_t = self._update_factors(Yb, YbT, Xb, gamma_ratio=self.lr[i], label_mask=label_mask)
+            if self.flag_expo:
+                expo_t, delta_expo = self._update_expo(Yb, n_users_batch, gamma_ratio=self.lr[i], F = Xb.todense(), label_mask=label_mask)
+            user_feat_t = self._update_user_feat(Xb,XbT, gamma_ratio=self.lr[i])
+            #===
+
+            k = 5
+            if acc is True:
+                X_pred = self.predict(Xb)
+                if self.verbose:
+                    print "\nprec on train data : ",
+                train_prec = self.evalPrecision(X_pred, Yb.todense(), k, verbose=self.verbose)
+
+                if label_mask is not None and self.verbose:
+                    print "Average exposure of hidden labels : ",
+                    print self.evalHiddenLabels(Yb, label_mask)
+
+                # if train_prec[0] < self.bad_start_limit:
+                #     print "!"*100
+                #     print "Killing due to bad start!"
+                #     print "Prec@1 is %.4f < Hard limit of %.4f"%(train_prec[0],self.bad_start_limit)
+                #     print "!"*100
+                #     return
+
+            if acc is True and test_flag:
+                if label_names is not None:
+                    self.printExposureExtremes(label_names,10,verbose=self.verbose)
+
+                if self.num_chunks > 1:
+                    Y_pred_test, Y_test_chunks = self.predict_chunks(X_test,Y_test,self.num_chunks)
+                    if self.verbose:
+                        print "prec on test data : ",
+                    test_ndcg = self.evalPrecisionChunk(Y_pred_test,Y_test_chunks,k,verbose=self.verbose)
+                    Y_pred_test = None
+                    Y_test_chunks = None
+                else:
+                    X_pred = self.predict(X_test)
+                    if self.verbose:
+                        print "prec on test data : ",
+                    test_prec = self.evalPrecision(X_pred,Y_test,k,verbose=self.verbose)
+                    # if self.verbose:
+                    #     print "nDCG@K on test data : ",
+                    # test_ndcg = self.nDCG_k(X_pred,Y_test,k,verbose=self.verbose)
+
+        # After training ends, save final model params
+        if self.save_params:
+            if self.verbose:
+                print "Saving final model to:"
+            print self._save_params() 
         pass
