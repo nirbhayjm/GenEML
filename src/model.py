@@ -309,3 +309,69 @@ class OnlineMF(BaseEstimator, TransformerMixin):
                 print "Saving final model to:"
             print self._save_params() 
         pass
+
+    def _update_factors(self, X, XT, F, gamma_ratio):
+        '''Update user and item collaborative factors with ALS'''
+        micro_batch_size = self.batch_size//self.n_jobs if self.n_jobs > 1 else self.batch_size
+
+        start_t = time.time()
+        self.theta = self.recompute_user_factors(gamma_ratio, batch_size=micro_batch_size, F_dense=F.todense())
+        user_time = time.time() - start_t
+
+        start_t = time.time()
+        self.beta = self.recompute_item_factors(self.theta, self.beta, XT,
+                                      self.lam_beta,
+                                      self.mu,
+                                      self.n_jobs,
+                                      gamma_ratio,
+                                      F_matrix = F.todense(),
+                                      batch_size=self.batch_size)
+        item_time = time.time() - start_t
+        # print "\nAverage change in beta:",np.sqrt(np.average((self.beta-old_beta)**2)),
+        return user_time,item_time
+
+    def recompute_user_factors(gamma_ratio, batch_size=256, F_dense=None):
+        m, n = Y.shape  # m = number of users, n = number of items
+        beta = self.beta
+        theta_old = self.theta
+        assert beta.shape[0] == n
+        assert theta_old.shape[0] == m
+
+        A_batch = self.a_row_batch(Y, F_dense)
+
+        theta_new = np.empty_like(theta_old, dtype=theta_old.dtype)
+
+        for ib in range(m):
+            theta_new[ib] = self._solve_users(ib, A_batch[ib], 
+                                Y, F_dense)
+        return theta_new
+
+    def a_row_batch(self, Y_batch, F):
+        '''Compute the posterior of exposure latent variables A by batch'''
+        pEX = (1/(1+np.exp(self.theta.dot(self.beta.T))))
+        mu = self.mu
+        A = (pEX + EPS) / (pEX + EPS + (1 - mu) / mu)
+        A[Y_batch.nonzero()] = 1.
+        return A
+
+    def _solve_users(self, k, A_k, Y, F_dense):
+        '''Update one single user factor theta_k'''
+
+        beta = self.beta
+        theta_old_k = self.theta[k]
+        W = self.W
+
+        psi = beta.dot(theta_old_k)
+        omega_k = 0.5*np.tanh(0.5*psi)/(EPS+psi)
+        # omega_k = 0*omega_k + 1.0
+        pw = A_k*omega_k
+        B = beta.T.dot(pw[:, np.newaxis] * beta) + (self.lam_theta * np.eye(self.n_components))
+        
+        kappa = np.asarray(Y.getrow(k).todense())[0] - 0.5
+        # kappa = 0.0*kappa + 1.0
+        t = np.dot(kappa*A_k, beta)
+        t2 = self.lam_theta * np.matmul(W, F_dense[k,:].T)
+        t2 = np.asarray(t2).reshape(-1)
+        a = t + t2
+
+        return LA.solve(B,a)
