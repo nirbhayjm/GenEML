@@ -6,6 +6,9 @@ def argparser():
     parser.add_argument('-model_name', type=str, default='generic_model_name')
     parser.add_argument('-mode', type=str, default='train')
 
+    # Dataset selection
+    parser.add_argument('-ds','--dataset', type=str, default='')
+
     # Train time options
     parser.add_argument('-num_epochs', type=int, default=10)
     parser.add_argument('-random_state', type=int, default=0)
@@ -35,7 +38,6 @@ def argparser():
     parser.add_argument('-init_mu_b', type=float, default=1.0)
     parser.add_argument('-init_std', type=float, default=1e-2)
     parser.add_argument('-init_W', type=float, default=1e-2)
-
 
     m_opts = vars(parser.parse_args())
 

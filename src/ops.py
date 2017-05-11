@@ -17,3 +17,6 @@ def sparsify(self, X, Y):
     if not ssp.issparse(Y):
         Y = ssp.csr_matrix(Y)
     return X,Y
+
+def shuffe(self, X, Y, random_state):
+    sklearn.utils.shuffle(X,Y,random_state=random_state)

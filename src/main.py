@@ -1,5 +1,4 @@
-import numpy as np
-
+# import numpy as np
 from model_new import initialize
 from ops import normalize,sparsify
 from inputs import argparser
@@ -13,3 +12,4 @@ if __name__ == '__main__':
     print m_opts
 
     m_vars = initialize(m_opts)
+
