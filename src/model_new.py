@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.linalg as linalg
 from scipy.io import loadmat,savemat
-from ops import normalize,sparsify,shuffle
+from ops import normalize,sparsify
 
 floatX = np.float32
 EPS = 1e-8
@@ -20,10 +20,7 @@ def initialize(m_opts):
 	m_vars['X_test'] = sparsify(data['Y_te'])
 
     m_vars['n_users'],m_vars['n_labels'] = m_vars['Y_train'].shape
-    m_vars['n_features'] = m_vars['F_train'].shape[1]
-
-    if m_opts['shuffle_minibatches']:
-    	shuffle(m_vars['Y_train'],m_vars['X_train'],random_state=m_opts['random_state'])
+    m_vars['n_features'] = m_vars['X_train'].shape[1]
 
     if m_opts['label_normalize']:
     	normalize(m_vars['Y_train'],norm='l2',axis=1,copy=False)
