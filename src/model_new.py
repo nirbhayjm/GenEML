@@ -52,3 +52,26 @@ def update_U(m_opts, m_vars):
 	K = PG(m_opts, m_vars) # polyagamma kappa_{nl}
 
 	sigma = 
+
+
+def saver(vars_path, m_vars, opts_path, m_opts):
+    # for key,val in m_vars:
+    #     if type(val) is np.ndarray:
+    #         np.save(vars_path+"_"+"key",val)
+    import pickle
+    with open(vars_path,"w") as vars_file:
+        pickle.dump(m_vars,vars_file)
+
+    import json
+    with open(opts_path,"w") as opts_file:
+        # opts_file.write(str(m_opts))
+        json.dump(m_opts,opts_file)
+
+def loader(vars_path, opts_path):
+    import pickle
+    with open(vars_path,"r") as vars_file:
+        m_vars = pickle.load(vars_file)
+
+    import json
+    with open(opts_path,"w") as opts_file:
+        m_opts = json.load(opts_file)
