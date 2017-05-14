@@ -58,13 +58,16 @@ def update(m_opts, m_vars):
 def update_U(m_opts, m_vars):
 	for i in range(m_opts['batch_size']):
 		for it in range(m_opts['PG_iters']):
-			P_i = E_xi_row(i, m_opts, m_vars) # expectation of xi_{nl} for n = i
-			N_i = E_omega_row(i, m_opts, m_vars) # expecation of omega_{nl} for n = i
+			P_i, N_i = E_xi_omega_row(i, m_opts, m_vars) # expectation of xi_{nl} for n = i, expecation of omega_{nl} for n = i
 			K_i = PG_row(i, m_opts, m_vars) # polyagamma kappa_{nl} for n = i
 			PN_i = P_i*N_i
 			PK_i = P_i*K_i
+			PN_i = PN_i[:,np.newaxis]
+			PK_i = PK_i[:,np.newaxis]
+
 			sigma = m_vars['V'].T.dot(PN_i*m_vars['V']) + m_opts['lam_u']*np.eye(m_opts['n_components'])
 			x = m_vars['V'].T.dot(PK_i) + m_opts['lam_u']*m_vars['W'].dot(m_vars['Xb'][i])
+
 			m_vars['Ub'][i] = LA.solve(sigma, x)
 
 def update_V(m_opts, m_vars):
@@ -74,6 +77,8 @@ def update_V(m_opts, m_vars):
 		K_i = PG_col(i, m_opts, m_vars) # polyagamma kappa_{nl} for l = i
 		PN_i = P_i*N_i
 		PK_i = P_i*K_i
+		PN_i = PN_i[:,np.newaxis]
+		PK_i = PK_i[:,np.newaxis]
 
 		sigma = m_vars['Ub'].T.dot(PN_i*m_vars['Ub']) + m_opts['lam_v']*np.eye(m_opts['n_components'])
 		x = m_vars['Ub'].T.dot(PK_i)
@@ -84,12 +89,11 @@ def update_V(m_opts, m_vars):
 
 def update_observance(m_opts, m_vars):
 	P = E_xi(m_opts, m_vars)
-	P = P.sum(axis=0)
+	P = P.sum(axis=0) # sum along column
 	mu = (m_vars['a']+P-1)/(m_vars['a']+m_vars['b']+m_vars['batch_size']-2)
     m_vars['mu'] = (1-m_opts['gamma'])*m_vars['mu'] + gamma_ratio*mu
 
 def update_W(m_opts, m_vars):
-
 	sigma = m_opts['lam_w']*(m_vars['Xb'].dot(m_vars['Xb']))
 	m_vars['sigma_W'] = (1-m_vars['gamma'])*m_vars['sigma_W'] + m_vars['gamma']*sigma
 
@@ -108,6 +112,44 @@ def update_W(m_opts, m_vars):
             if info < 0:
                 print "WARNING: sp_linalg.cg info: illegal input or breakdown"
             m_vars['W'][i, :] = w.T
+
+def E_xi_omega_row(row_no, m_opts, m_vars):
+	sigmoid = lambda x: 1/(1+np.exp(-x))
+	PSI = m_vars['Ub'][row_no].dot(m_vars['V'].T)
+	E_omega = 0.5*np.tanh(0.5*PSI)/(EPS+PSI)
+	PSI = -PSI
+	PSI = np.clip(PSI, -np.inf, -20)
+	PSI_sigmoid = sigmoid(PSI)
+	E_xi = (m_vars['mu']*PSI_sigmoid)/(EPS+m_vars['mu']*PSI_sigmoid+(1.-m_vars['mu']))
+	E_xi[m_vars['Yb'][row_no].nonzero()] = 1.
+	return E_xi, E_omega
+
+def PG_row(row_no, m_opts, m_vars):
+	return m_vars['Yb'][row_no]-0.5
+
+def E_xi_omega_col(col_no, m_opts, m_vars):
+	sigmoid = lambda x: 1/(1+np.exp(-x))
+	PSI = m_vars['V'][col_no].dot(m_vars['Ub'].T)
+	E_omega = 0.5*np.tanh(0.5*PSI)/(EPS+PSI)
+	PSI = -PSI
+	PSI = np.clip(PSI, -np.inf, -20)
+	PSI_sigmoid = sigmoid(PSI)
+	E_xi = (m_vars['mu'][col_no]*PSI_sigmoid)/(EPS+m_vars['mu'][col_no]*PSI_sigmoid+(1.-m_vars['mu'][col_no]))
+	E_xi[m_vars['Yb'][:,col_no].nonzero()] = 1.
+	return E_xi, E_omega
+
+def PG_col(col_no, m_opts, m_vars):
+	return m_vars['Yb'][:,col_no]-0.5
+
+def E_xi(m_opts, m_vars):
+	sigmoid = lambda x: 1/(1+np.exp(-x))
+	PSI = m_vars['Ub'].dot(m_vars['V'].T)
+	PSI = -PSI
+	PSI = np.clip(PSI, -np.inf, -20)
+	PSI_sigmoid = sigmoid(PSI)
+	E_xi = (m_vars['mu']*PSI_sigmoid)/(EPS+m_vars['mu']*PSI_sigmoid+(1.-m_vars['mu']))
+	E_xi[m_vars['Yb'].nonzero()] = 1.
+	return E_xi
 
 def saver(vars_path, m_vars, opts_path, m_opts):
     # for key,val in m_vars:
