@@ -72,8 +72,7 @@ def update_U(m_opts, m_vars):
 
 def update_V(m_opts, m_vars):
 	for i in range(m_vars['n_labels']):
-		P_i = E_xi_col(i, m_opts, m_vars) # expectation of xi_{nl} for l = i
-		N_i = E_omega_col(i, m_opts, m_vars) # expecation of omega_{nl} for l = i 
+		P_i, N_i = E_xi_omega_col(i, m_opts, m_vars) # expectation of xi_{nl} for l = i, expecation of omega_{nl} for l = i 
 		K_i = PG_col(i, m_opts, m_vars) # polyagamma kappa_{nl} for l = i
 		PN_i = P_i*N_i
 		PK_i = P_i*K_i
