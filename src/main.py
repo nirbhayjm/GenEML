@@ -30,7 +30,7 @@ if __name__ == '__main__':
     	start_epoch_t = time.time()
 
 	    if m_opts['shuffle_minibatches']:
-	    	shuffle(m_vars['Y_train'],m_vars['X_train'],random_state=m_opts['random_state']+epoch_idx)
+	    	shuffle(m_vars['Y_train'],m_vars['X_train'],m_vars['U'],random_state=m_opts['random_state']+epoch_idx)
 
     	for minibatch_idx in range(minibatch_count):
     		iter_idx += 1
@@ -45,6 +45,7 @@ if __name__ == '__main__':
 
     		# Updates go here
     		m_vars = update(m_opts, m_vars)
+            m_vars['U'][lo:hi] = m_vars['U_batch'] #copying updated user factors of minibatch to global user factor matrix
 
     		if test_flag:
     			# Train and test precision computation goes here

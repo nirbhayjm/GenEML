@@ -47,11 +47,3 @@ def argparser():
 
     return m_opts
 
-# def make_inputs(m_opts):
-#     m_vars = {}
-
-#     if m_opts['mode'] == 'train':
-#         pass
-#     else:
-#         raise ValueError
-#     return m_vars
