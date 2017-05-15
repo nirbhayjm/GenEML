@@ -49,7 +49,13 @@ if __name__ == '__main__':
 
     		if test_flag:
     			# Train and test precision computation goes here
-    			pass
+                Y_pred = predict(m_opts, m_vars)
+                p_k = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
+                if m_opts['verbose']:
+                    for i in p_k:
+                        print " %0.4f "%i,
+                    print ""
+                m_vars['performance']['prec@k'].append(p_k)
 
         print('\nEpoch time=%.2f'% (time.time() - start_epoch_t))
 

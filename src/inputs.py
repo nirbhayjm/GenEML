@@ -19,6 +19,7 @@ def argparser():
     parser.add_argument('-display_interval', type=int, default=1)
     parser.add_argument('-test_interval', type=int, default=1)
     parser.add_argument('-v','--verbose', action='store_true')
+    parser.add_argument('-performance_k', type=int, default=5)
     
     # Model parameters
     parser.add_argument('-observance', type=bool, default=True)

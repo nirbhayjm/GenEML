@@ -44,6 +44,8 @@ def initialize(m_opts):
     else:
     	m_vars['mu'] = np.ones(m_vars['n_labels']).astype(floatX)
 
+    m_vars['performance'] = {'prec@k':[], 'dcg@k':[], 'ndcg@k':[]} # storing the performance measures along iterations
+
     return m_vars
 
 def update(m_opts, m_vars):
@@ -146,6 +148,15 @@ def E_xi(m_opts, m_vars):
 	E_xi = (m_vars['mu']*PSI_sigmoid)/(EPS+m_vars['mu']*PSI_sigmoid+(1.-m_vars['mu']))
 	E_xi[m_vars['Y_batch'].nonzero()] = 1.
 	return E_xi
+
+def predict(m_opts, m_vars):
+	sigmoid = lambda x: 1/(1+np.exp(-x))
+	U = m_vars['W'].dot(m_vars['X_test'].T)
+	Y_pred = U.dot(m_vars['V'])
+	Y_pred = np.clip(Y_pred, -np.inf, -20)
+	Y_pred = sigmoid(Y_pred)
+	Y_pred = Y_pred*m_vars['mu']
+	return Y_pred
 
 def saver(vars_path, m_vars, opts_path, m_opts):
     import pickle
