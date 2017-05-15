@@ -60,7 +60,6 @@ if __name__ == '__main__':
         print('\nEpoch time=%.2f'% (time.time() - start_epoch_t))
 
         # Saving at the end of each epoch goes here.
-        # TODO: Write model saver function.
         if m_opts['save']:
         	save_path = 'checkpoints/'+m_opts['name']+'/'
         				+str(epoch_idx)+"_"
