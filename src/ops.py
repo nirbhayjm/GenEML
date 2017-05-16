@@ -1,6 +1,6 @@
 import sklearn
 
-def normalize(self, M):
+def normalize(M):
     '''
     Normalize
     ----------
@@ -11,12 +11,12 @@ def normalize(self, M):
         sklearn.preprocessing.normalize(M,norm='l2',axis=1,copy=False)
     return
 
-def sparsify(self, X, Y):
-	import scipy.sparse as ssp
+def sparsify(Y):
+    import scipy.sparse as ssp
 
     if not ssp.issparse(Y):
         Y = ssp.csr_matrix(Y)
-    return X,Y
+    return Y
 
-def shuffe(self, X, Y, random_state):
-    sklearn.utils.shuffle(X,Y,random_state=random_state)
+def shuffle(X, Y, Z, random_state):
+    sklearn.utils.shuffle(X,Y,Z,random_state=random_state)
