@@ -1,5 +1,5 @@
 import numpy as np
-from model_new import initialize,update,saver
+from model_new import initialize,update,saver,predict
 from ops import normalize,sparsify,shuffle
 from inputs import argparser
 from evaluation import precisionAtK
@@ -53,13 +53,14 @@ if __name__ == '__main__':
                 # Train and test precision computation goes here
                 Y_pred = predict(m_opts, m_vars)
                 p_k = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
+                print "Iter no.: ",iter_idx,
                 if m_opts['verbose']:
                     for i in p_k:
                         print " %0.4f "%i,
                     print ""
                 m_vars['performance']['prec@k'].append(p_k)
 
-        print('\nEpoch time=%.2f'% (time.time() - start_epoch_t))
+        print('Epoch time=%.2f'% (time.time() - start_epoch_t))
 
         # Saving at the end of each epoch goes here.
         if m_opts['save']:
