@@ -13,7 +13,9 @@ if __name__ == '__main__':
     print m_opts
 
     m_vars = initialize(m_opts)
-
+    print 'Model Variables:'
+    # print m_vars
+    
     iter_idx = -1
     start_idx = range(0, m_vars['n_users'], m_opts['batch_size'])
     end_idx = start_idx[1:]

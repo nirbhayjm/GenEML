@@ -66,9 +66,20 @@ def update_U(m_opts, m_vars):
             PN_i = PN_i[:,np.newaxis]
 
             sigma = m_vars['V'].T.dot(PN_i*m_vars['V']) + m_opts['lam_u']*np.eye(m_opts['n_components'])
-            x = m_vars['V'].T.dot(PK_i) + m_opts['lam_u']*m_vars['W'].dot(m_vars['X_batch'][i])
-
-            m_vars['U_batch'][i] = LA.solve(sigma, x)
+            # print m_vars['V'].shape, PK_i.shape, m_vars['W'].shape, m_vars['X_batch'][i].shape
+            y = m_vars['V'].T.dot(PK_i)
+            # print m_vars['W'].shape, m_vars['X_batch'][i].T.shape
+            # print "Xbatch:",m_vars['X_batch'][i].shape
+            z = (m_opts['lam_u']*m_vars['W']).dot(m_vars['X_batch'][i].todense().T)
+            z = np.asarray(z).reshape(-1)
+            # print z.shape,type(z)
+            # print y.shape,type(y)
+            x = y+z
+            # print "x:",x.shape
+            # assert False
+            # print sigma.shape, x.shape
+            # print t.shape
+            m_vars['U_batch'][i] = linalg.solve(sigma, x)
 
 def update_V(m_opts, m_vars):
     for i in range(m_vars['n_labels']):
@@ -83,7 +94,7 @@ def update_V(m_opts, m_vars):
 
         m_vars['sigma_v'][i] = (1-m_vars['gamma'])*m_vars['sigma_v'][i] + gamma_ratio*sigma
         m_vars['x_v'][i] = (1-m_vars['gamma'])*m_vars['x_v'][i] + gamma_ratio*x
-        m_vars['V'][i] = LA.solve(m_vars['sigma_v'][i], m_vars['x_v'][i])
+        m_vars['V'][i] = linalg.solve(m_vars['sigma_v'][i], m_vars['x_v'][i])
 
 def update_observance(m_opts, m_vars):
     P = E_xi(m_opts, m_vars)
@@ -99,7 +110,7 @@ def update_W(m_opts, m_vars):
     m_vars['x_W'] = (1-m_vars['gamma'])*m_vars['x_W'] + m_vars['gamma']*x
 
     if m_opts['use_cg'] != True: # For the Ridge regression on W matrix with the closed form solutions 
-        sigma = LA.inv(m_vars['sigma_W']) # O(N^3) time for N x N matrix inversion 
+        sigma = linalg.inv(m_vars['sigma_W']) # O(N^3) time for N x N matrix inversion 
         m_vars = sigma.dot(m_vars['x_W'])
     else: # For the CG on the ridge loss to calculate W matrix
         Y = m_vars['x_W']
@@ -119,11 +130,14 @@ def E_xi_omega_row(row_no, m_opts, m_vars):
     PSI = np.clip(PSI, -np.inf, -20)
     PSI_sigmoid = sigmoid(PSI)
     E_xi = (m_vars['mu']*PSI_sigmoid)/(EPS+m_vars['mu']*PSI_sigmoid+(1.-m_vars['mu']))
-    E_xi[m_vars['Y_batch'][row_no].nonzero()] = 1.
+
+    # print (m_vars['Y_batch'][row_no]).nonzero()[1]
+    E_xi[m_vars['Y_batch'][row_no].nonzero()[1]] = 1.
     return E_xi, E_omega
 
 def PG_row(row_no, m_opts, m_vars):
-    return m_vars['Yb'][row_no]-0.5
+    PG = m_vars['Y_batch'][row_no].todense()-0.5
+    return np.array(PG).reshape(-1)
 
 def E_xi_omega_col(col_no, m_opts, m_vars):
     sigmoid = lambda x: 1/(1+np.exp(-x))
