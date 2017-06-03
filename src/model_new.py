@@ -2,7 +2,7 @@ import numpy as np
 import numpy.linalg as linalg
 from scipy.sparse import linalg as sp_linalg
 from scipy.io import loadmat,savemat
-from ops import normalize,sparsify
+from ops import normalize,sparsify,sigmoid
 
 floatX = np.float32
 EPS = 1e-8
@@ -20,8 +20,8 @@ def initialize(m_opts):
     m_vars['Y_test'] = sparsify(data['X_te'])
     m_vars['X_test'] = sparsify(data['Y_te'])
 
-    print m_vars['Y_train'].shape, m_vars['X_train'].shape
-    print m_vars['Y_test'].shape, m_vars['X_test'].shape 
+    print "Train Dims",m_vars['Y_train'].shape, m_vars['X_train'].shape
+    print "Test Dims",m_vars['Y_test'].shape, m_vars['X_test'].shape 
 
     m_vars['n_users'],m_vars['n_labels'] = m_vars['Y_train'].shape
     m_vars['n_features'] = m_vars['X_train'].shape[1]
@@ -74,7 +74,8 @@ def update_U(m_opts, m_vars):
 
             sigma = m_vars['V'].T.dot(PN_i*m_vars['V']) + m_opts['lam_u']*np.eye(m_opts['n_components'])
             y = m_vars['V'].T.dot(PK_i)
-            z = (m_opts['lam_u']*m_vars['W']).dot(m_vars['X_batch'][i].todense().T)
+            # z = (m_opts['lam_u']*m_vars['W']).dot(m_vars['X_batch'][i].todense().T)
+            z = m_opts['lam_u']*np.matmul(m_vars['W'], m_vars['X_batch'][i,:].todense().T)
             z = np.asarray(z).reshape(-1)
             x = y+z
             m_vars['U_batch'][i] = linalg.solve(sigma, x)
@@ -121,12 +122,12 @@ def update_W(m_opts, m_vars):
             m_vars['W'][i, :] = w.T
 
 def E_xi_omega_row(row_no, m_opts, m_vars):
-    sigmoid = lambda x: 1/(1+np.exp(-x))
-    PSI = m_vars['U_batch'][row_no].dot(m_vars['V'].T)
+    # sigmoid = lambda x: 1/(1+np.exp(-x))
+    PSI = m_vars['U_batch'][row_no].dot(m_vars['V'].T)  
     E_omega = 0.5*np.tanh(0.5*PSI)/(EPS+PSI)
-    PSI = -PSI
-    PSI = np.clip(PSI, -np.inf, -20)
-    PSI_sigmoid = sigmoid(PSI)
+    # PSI = -PSI
+    # PSI = np.clip(PSI, -np.inf, -20)
+    PSI_sigmoid = sigmoid(-PSI)
     E_xi = (m_vars['mu']*PSI_sigmoid)/(EPS+m_vars['mu']*PSI_sigmoid+(1.-m_vars['mu']))
 
     E_xi[m_vars['Y_batch'][row_no].nonzero()[1]] = 1.
@@ -137,12 +138,12 @@ def PG_row(row_no, m_opts, m_vars):
     return np.array(PG).reshape(-1)
 
 def E_xi_omega_col(col_no, m_opts, m_vars):
-    sigmoid = lambda x: 1/(1+np.exp(-x))
+    # sigmoid = lambda x: 1/(1+np.exp(-x))
     PSI = m_vars['V'][col_no].dot(m_vars['U_batch'].T)
     E_omega = 0.5*np.tanh(0.5*PSI)/(EPS+PSI)
-    PSI = -PSI
-    PSI = np.clip(PSI, -np.inf, -20)
-    PSI_sigmoid = sigmoid(PSI)
+    # PSI = -PSI
+    # PSI = np.clip(PSI, -np.inf, -20)
+    PSI_sigmoid = sigmoid(-PSI)
     E_xi = (m_vars['mu'][col_no]*PSI_sigmoid)/(EPS+m_vars['mu'][col_no]*PSI_sigmoid+(1.-m_vars['mu'][col_no]))
 
     E_xi[m_vars['Y_batch'][:,col_no].nonzero()[0]] = 1.
@@ -153,20 +154,26 @@ def PG_col(col_no, m_opts, m_vars):
     return np.array(PG).reshape(-1)
 
 def E_xi(m_opts, m_vars):
-    sigmoid = lambda x: 1/(1+np.exp(-x))
+    # sigmoid = lambda x: 1/(1+np.exp(-x))
     PSI = m_vars['U_batch'].dot(m_vars['V'].T)
     PSI = -PSI
-    PSI = np.clip(PSI, -np.inf, -20)
+    # PSI = np.clip(PSI, -np.inf, -20)
     PSI_sigmoid = sigmoid(PSI)
     E_xi = (m_vars['mu']*PSI_sigmoid)/(EPS+m_vars['mu']*PSI_sigmoid+(1.-m_vars['mu']))
     E_xi[m_vars['Y_batch'].nonzero()] = 1.
     return E_xi
 
-def predict(m_opts, m_vars):
-    sigmoid = lambda x: 1/(1+np.exp(-x))
-    U = m_vars['X_test'].dot(m_vars['W'].T)
-    Y_pred = U.dot(m_vars['V'].T)
-    Y_pred = np.clip(Y_pred, -np.inf, -20)
+def predict(X_input, m_opts, m_vars):
+    # '''SANITY CHECK'''
+    # print "Test dimensions:"
+    # print m_vars['X_test'].shape
+    # '''END SANITY CHECK'''
+
+    # sigmoid = lambda x: 1/(1+np.exp(-x))
+    # U = m_vars['X_test'].dot(m_vars['W'].T)
+    U = X_input.dot(m_vars['W'].T)
+    Y_pred = np.asarray(U.dot(m_vars['V'].T))
+    # Y_pred = np.clip(Y_pred, -np.inf, -20)
     Y_pred = sigmoid(Y_pred)
     Y_pred = Y_pred*m_vars['mu']
     return Y_pred

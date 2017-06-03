@@ -32,12 +32,12 @@ def argparser():
     parser.add_argument('-lam_w', type=float, default=1e-3)
     parser.add_argument('-label_normalize', action='store_true')
     parser.add_argument('-use_cg', type=bool, default=True)
-    parser.add_argument('-cg_iters', type=int, default=10)
+    parser.add_argument('-cg_iters', type=int, default=5)
     parser.add_argument('-PG_iters', type=int, default=3)
 
     # Learning rate parameters
     parser.add_argument('-lr_alpha', type=float, default=1e-2)
-    parser.add_argument('-lr_tau', type=float, default=0.75)
+    parser.add_argument('-lr_tau', type=float, default=1.0)
     
     # Variable initializations
     parser.add_argument('-init_mu_a', type=float, default=1.0)

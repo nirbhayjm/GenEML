@@ -2,7 +2,7 @@ import numpy as np
 from model_new import initialize,update,saver,predict
 from ops import normalize,sparsify,shuffle
 from inputs import argparser
-from evaluation import precisionAtK
+from evaluation import precisionAtK,nDCG_k
 
 import time
 import os
@@ -49,16 +49,34 @@ if __name__ == '__main__':
             m_vars = update(m_opts, m_vars)
             m_vars['U'][lo:hi] = m_vars['U_batch'] #copying updated user factors of minibatch to global user factor matrix
 
-            if test_flag:
-                # Train and test precision computation goes here
-                Y_pred = predict(m_opts, m_vars)
-                p_k = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
+            if display_flag:
                 print "Iter no.: ",iter_idx,
+                print "\tGamma : %6g"%m_vars['gamma']
+
+                # Train precision
+                Y_train_pred = predict(m_vars['X_batch'],m_opts,m_vars)
+                p_scores = precisionAtK(Y_train_pred, m_vars['Y_batch'], m_opts['performance_k'])
                 if m_opts['verbose']:
-                    for i in p_k:
+                    print "Train score:",
+                    for i in p_scores:
+                        print " %0.4f"%i,
+                    print ""
+
+            if test_flag:
+                # Test precision computation goes here
+                Y_pred = predict(m_vars['X_test'],m_opts,m_vars)
+                p_scores = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
+                nDCG_scores = nDCG_k(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
+                if m_opts['verbose']:
+                    print "Test score:",
+                    for i in p_scores:
                         print " %0.4f "%i,
                     print ""
-                m_vars['performance']['prec@k'].append(p_k)
+                    print "Test nDCG score:",
+                    for i in nDCG_scores:
+                        print " %0.4f "%i,
+                    print ""
+                m_vars['performance']['prec@k'].append(p_scores)
 
         print('Epoch time=%.2f'% (time.time() - start_epoch_t))
 

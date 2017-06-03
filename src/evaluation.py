@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.sparse as ssp
 
 def precisionAtK(Y_pred_orig, Y_true_orig, k, verbose=False):
     Y_pred = Y_pred_orig.copy()
@@ -38,14 +39,14 @@ def DCG_k(Y_pred_orig, Y_true_orig, k, verbose=False):
     return p
 
 def nDCG_k(Y_pred, Y_true, k, verbose=False):
-    DCG_k = self.DCG_k(Y_pred, Y_true, k)
+    DCG_k_score = DCG_k(Y_pred, Y_true, k)
     if ssp.issparse(Y_true):
-        IDCG_k = self.DCG_k(Y_true.todense(), Y_true, k)
+        IDCG_k_score = DCG_k(Y_true.todense(), Y_true, k)
     else:
-        IDCG_k = self.DCG_k(Y_true, Y_true, k)
+        IDCG_k_score = DCG_k(Y_true, Y_true, k)
 
-    p = DCG_k/IDCG_k
-    # p = DCG_k
+    p = DCG_k_score/IDCG_k_score
+    # p = DCG_k_score
 
     # if verbose:
     #     for i in p[[0,2,4]]:

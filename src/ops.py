@@ -1,4 +1,5 @@
 import sklearn
+import numpy as np
 
 def normalize(M):
     '''
@@ -20,3 +21,7 @@ def sparsify(Y):
 
 def shuffle(X, Y, Z, random_state):
     sklearn.utils.shuffle(X,Y,Z,random_state=random_state)
+
+def sigmoid(x):
+    y = np.clip(x, -20, np.inf)
+    return 1/(1+np.exp(-y))
