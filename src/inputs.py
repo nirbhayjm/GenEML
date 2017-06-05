@@ -23,23 +23,24 @@ def argparser():
     
     # Model parameters
     parser.add_argument('-observance', type=bool, default=True)
-    parser.add_argument('-bs','--batch_size', type=int, default=256)
+    parser.add_argument('-bs','--batch_size', type=int, default=1024)
     # parser.add_argument('-u_bsize', type=int, default=256)
     # parser.add_argument('-l_bsize', type=int, default=256)
-    parser.add_argument('-n_components', type=int, default=100)
+    parser.add_argument('-n_components', type=int, default=200)
     parser.add_argument('-lam_u', type=float, default=1e-3)
     parser.add_argument('-lam_v', type=float, default=1e-3)
-    parser.add_argument('-lam_w', type=float, default=1e-3)
+    parser.add_argument('-lam_w', type=float, default=1e-4)
     parser.add_argument('-label_normalize', action='store_true')
     parser.add_argument('-use_cg', type=bool, default=True)
-    parser.add_argument('-cg_iters', type=int, default=10)
-    parser.add_argument('-PG_iters', type=int, default=3)
+    parser.add_argument('-cg_iters', type=int, default=5)
+    parser.add_argument('-PG_iters', type=int, default=5)
 
     # Learning rate parameters
-    parser.add_argument('-lr_alpha', type=float, default=1e-2)
-    parser.add_argument('-lr_tau', type=float, default=0.75)
+    parser.add_argument('-lr_alpha', type=float, default=0.6)
+    parser.add_argument('-lr_tau', type=float, default=0.55)
     
     # Variable initializations
+    parser.add_argument('-init_mu', type=float, default=0.01)
     parser.add_argument('-init_mu_a', type=float, default=1.0)
     parser.add_argument('-init_mu_b', type=float, default=1.0)
     parser.add_argument('-init_std', type=float, default=1e-2)
