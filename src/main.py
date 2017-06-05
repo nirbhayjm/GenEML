@@ -21,8 +21,8 @@ if __name__ == '__main__':
     end_idx = start_idx[1:]
 
     minibatch_count = m_vars['n_users']//m_opts['batch_size']
-    lr = (1.0 + np.arange(minibatch_count*m_opts['num_epochs']))**(-m_opts['lr_tau'])
-    lr = np.clip(minibatch_count*m_opts['lr_alpha']*lr,1e-10,0.9)
+    lr = m_opts['lr_alpha']*(1.0 + np.arange(minibatch_count*m_opts['num_epochs']))**(-m_opts['lr_tau'])
+    # lr = np.clip(minibatch_count*m_opts['lr_alpha']*lr,1e-10,0.9)
 
     if m_opts['save']:
         os.system('mkdir -p checkpoints/'+m_opts['name']+'/')
@@ -46,19 +46,29 @@ if __name__ == '__main__':
             m_vars['gamma'] = lr[iter_idx]
 
             # Updates go here
+            print "gamma: ", lr[iter_idx], 
             m_vars = update(m_opts, m_vars)
             m_vars['U'][lo:hi] = m_vars['U_batch'] #copying updated user factors of minibatch to global user factor matrix
 
             if test_flag:
                 # Train and test precision computation goes here
-                Y_pred = predict(m_opts, m_vars)
-                p_k = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
-                print "Iter no.: ",iter_idx,
+                Y_pred = predict(m_opts, m_vars, m_vars['X_train'])
+                p_k = precisionAtK(Y_pred, m_vars['Y_train'], m_opts['performance_k'])
+                print " Iter no.: ",iter_idx+1
+                print "Training -- ",
                 if m_opts['verbose']:
                     for i in p_k:
                         print " %0.4f "%i,
                     print ""
                 m_vars['performance']['prec@k'].append(p_k)
+
+                Y_pred = predict(m_opts, m_vars, m_vars['X_test'])
+                p_k = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
+                print " Testing -- ",
+                if m_opts['verbose']:
+                    for i in p_k:
+                        print " %0.4f "%i,
+                    print ""
 
         print('Epoch time=%.2f'% (time.time() - start_epoch_t))
 
