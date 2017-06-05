@@ -20,8 +20,8 @@ def initialize(m_opts):
     m_vars['Y_test'] = sparsify(data['X_te'])
     m_vars['X_test'] = sparsify(data['Y_te'])
 
-    print m_vars['Y_train'].shape, m_vars['X_train'].shape
-    print m_vars['Y_test'].shape, m_vars['X_test'].shape 
+    print "Training data --  Y:",m_vars['Y_train'].shape," X:", m_vars['X_train'].shape
+    print "Testing data -- Y:",m_vars['Y_test'].shape,"X: ", m_vars['X_test'].shape 
 
     m_vars['n_users'],m_vars['n_labels'] = m_vars['Y_train'].shape
     m_vars['n_features'] = m_vars['X_train'].shape[1]
@@ -34,9 +34,6 @@ def initialize(m_opts):
     m_vars['V'] = m_opts['init_std']*np.random.randn(m_vars['n_labels'], m_opts['n_components']).astype(floatX)
     m_vars['W'] = m_opts['init_W']*np.random.randn(m_opts['n_components'],m_vars['n_features']).astype(floatX)
 
-    m_vars['a'] = 1.
-    m_vars['b'] = 1.
-
     # accumulator of sufficient statistics of label factors
     m_vars['sigma_v'] = np.zeros((m_vars['n_labels'], m_opts['n_components'], m_opts['n_components']))
     m_vars['x_v'] = np.zeros((m_vars['n_labels'], m_opts['n_components']))
@@ -46,8 +43,8 @@ def initialize(m_opts):
     m_vars['x_W'] = np.zeros((m_vars['n_features'], m_opts['n_components']))
 
     if m_opts['observance']:
-        a0,b0 = m_opts['init_mu_a'],m_opts['init_mu_b']
-        m_vars['mu'] = np.random.beta(a0,b0,size=(m_vars['n_labels']) ) #, dtype=floatX)
+        m_vars['a'],m_vars['b'] = m_opts['init_mu_a'],m_opts['init_mu_b']
+        m_vars['mu'] = np.random.beta(m_vars['a'],m_vars['b'],size=(m_vars['n_labels']) ) #, dtype=floatX)
     else:
         m_vars['mu'] = np.ones(m_vars['n_labels']).astype(floatX)
 

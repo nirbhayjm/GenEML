@@ -12,8 +12,8 @@ if __name__ == '__main__':
     print 'Model Options:'
     print m_opts
 
-    m_vars = initialize(m_opts)
     print 'Model Variables:'
+    m_vars = initialize(m_opts)
     # print m_vars
     
     iter_idx = -1

@@ -24,8 +24,6 @@ def argparser():
     # Model parameters
     parser.add_argument('-observance', type=bool, default=True)
     parser.add_argument('-batch_size', type=int, default=256)
-    # parser.add_argument('-u_bsize', type=int, default=256)
-    # parser.add_argument('-l_bsize', type=int, default=256)
     parser.add_argument('-n_components', type=int, default=100)
     parser.add_argument('-lam_u', type=float, default=1e-3)
     parser.add_argument('-lam_v', type=float, default=1e-3)
