@@ -21,6 +21,8 @@ if __name__ == '__main__':
     end_idx = start_idx[1:]
 
     minibatch_count = m_vars['n_users']//m_opts['batch_size']
+    if minibatch_count == len(start_idx):
+        end_idx.append(m_vars['n_users'])
     lr = m_opts['lr_alpha']*(1.0 + np.arange(minibatch_count*m_opts['num_epochs']))**(-m_opts['lr_tau'])
     # lr = np.clip(minibatch_count*m_opts['lr_alpha']*lr,1e-10,0.9)
 
