@@ -1,5 +1,5 @@
 import numpy as np
-from model_new import initialize,update,saver,predict
+from model import initialize,update,saver,predict
 from ops import normalize,sparsify,shuffle
 from inputs import argparser
 from evaluation import precisionAtK
