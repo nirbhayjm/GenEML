@@ -10,7 +10,6 @@ import os
 if __name__ == '__main__':
     m_opts = argparser()
     print 'Model Options:'
-    print m_opts['observance']
     print m_opts
 
     print 'Model Variables:'
