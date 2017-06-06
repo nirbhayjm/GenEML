@@ -31,9 +31,9 @@ def argparser():
     parser.add_argument('-lam_v', type=float, default=1e-3)
     parser.add_argument('-lam_w', type=float, default=1e-4)
     parser.add_argument('-label_normalize', action='store_true')
-    parser.add_argument('-use_cg', type=bool, default=True)
+    parser.add_argument('-use_cg', action='store_true', default=False)
     parser.add_argument('-cg_iters', type=int, default=5)
-    parser.add_argument('-PG_iters', type=int, default=5)
+    parser.add_argument('-PG_iters', type=int, default=1)
 
     # Learning rate parameters
     parser.add_argument('-lr_alpha', type=float, default=0.6)

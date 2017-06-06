@@ -108,7 +108,8 @@ def update_W(m_opts, m_vars):
 
     if m_opts['use_cg'] != True: # For the Ridge regression on W matrix with the closed form solutions 
         sigma = linalg.inv(m_vars['sigma_W']) # O(N^3) time for N x N matrix inversion 
-        m_vars = sigma.dot(m_vars['x_W'])
+        m_vars['W'] = np.asarray(sigma.dot(m_vars['x_W'])).T
+
     else: # For the CG on the ridge loss to calculate W matrix
         Y = m_vars['x_W']
         X = m_vars['sigma_W']
