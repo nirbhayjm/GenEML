@@ -3,6 +3,7 @@ from model import initialize,update,saver,predict
 from ops import normalize,sparsify,shuffle
 from inputs import argparser
 from evaluation import precisionAtK
+from scipy.io import loadmat,savemat
 
 import time
 import os
@@ -74,6 +75,12 @@ if __name__ == '__main__':
 
         print('Epoch time=%.2f'% (time.time() - start_epoch_t))
 
+        # print m_vars['mu']
+        data = loadmat("../data/synth_data.mat")
+        # print data['mu']
+        for i in range(len(m_vars['mu'])):
+            print "%0.2f, %.2f" %(m_vars['mu'][i], data['mu'][0][i])
+
         # Saving at the end of each epoch goes here.
         if m_opts['save']:
             save_path = 'checkpoints/'+m_opts['name']+'/'\
@@ -82,3 +89,4 @@ if __name__ == '__main__':
             save_model_name = save_path+".model"
             save_opts = save_path+".txt"
             saver(save_model_name,m_vars,save_opts,m_opts)
+
