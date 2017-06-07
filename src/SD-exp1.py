@@ -2,7 +2,8 @@ import numpy as np
 from model import initialize,update,saver,predict
 from ops import normalize,sparsify,shuffle
 from inputs import argparser
-from evaluation import precisionAtK,nDCG_k
+from evaluation import precisionAtK
+from scipy.io import loadmat,savemat
 
 import time
 import os
@@ -22,7 +23,7 @@ if __name__ == '__main__':
 
     minibatch_count = m_vars['n_users']//m_opts['batch_size']
     if minibatch_count == len(start_idx):
-        end_idx.append(m_vars['n_users'])
+    	end_idx.append(m_vars['n_users'])
     lr = m_opts['lr_alpha']*(1.0 + np.arange(minibatch_count*m_opts['num_epochs']))**(-m_opts['lr_tau'])
     # lr = np.clip(minibatch_count*m_opts['lr_alpha']*lr,1e-10,0.9)
 
@@ -52,34 +53,17 @@ if __name__ == '__main__':
             m_vars = update(m_opts, m_vars)
             m_vars['U'][lo:hi] = m_vars['U_batch'] #copying updated user factors of minibatch to global user factor matrix
 
-            if display_flag:
-                print "Iter no.: ",iter_idx,
-                print "\tGamma : %6g"%m_vars['gamma']
-
-                # Train precision
-                Y_train_pred = predict(m_vars['X_batch'],m_opts,m_vars)
-                p_scores = precisionAtK(Y_train_pred, m_vars['Y_batch'], m_opts['performance_k'])
-                if m_opts['verbose']:
-                    print "Train score:",
-                    for i in p_scores:
-                        print " %0.4f"%i,
-                    print ""
-
             if test_flag:
-                # Test precision computation goes here
-                Y_pred = predict(m_vars['X_test'],m_opts,m_vars)
-                p_scores = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
-                nDCG_scores = nDCG_k(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
+                # Train and test precision computation goes here
+                Y_pred = predict(m_opts, m_vars, m_vars['X_train'])
+                p_k = precisionAtK(Y_pred, m_vars['Y_train'], m_opts['performance_k'])
+                print " Iter no.: ",iter_idx+1
+                print "Training -- ",
                 if m_opts['verbose']:
-                    print "Test score:",
-                    for i in p_scores:
+                    for i in p_k:
                         print " %0.4f "%i,
                     print ""
-                    print "Test nDCG score:",
-                    for i in nDCG_scores:
-                        print " %0.4f "%i,
-                    print ""
-                m_vars['performance']['prec@k'].append(p_scores)
+                m_vars['performance']['prec@k'].append(p_k)
 
                 Y_pred = predict(m_opts, m_vars, m_vars['X_test'])
                 p_k = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
@@ -91,6 +75,12 @@ if __name__ == '__main__':
 
         print('Epoch time=%.2f'% (time.time() - start_epoch_t))
 
+        # print m_vars['mu']
+        data = loadmat("../data/synth_data.mat")
+        # print data['mu']
+        for i in range(len(m_vars['mu'])):
+            print "%0.2f, %.2f" %(m_vars['mu'][i], data['mu'][0][i])
+
         # Saving at the end of each epoch goes here.
         if m_opts['save']:
             save_path = 'checkpoints/'+m_opts['name']+'/'\
@@ -99,3 +89,4 @@ if __name__ == '__main__':
             save_model_name = save_path+".model"
             save_opts = save_path+".txt"
             saver(save_model_name,m_vars,save_opts,m_opts)
+
