@@ -57,7 +57,7 @@ if __name__ == '__main__':
                 print "\tGamma : %6g"%m_vars['gamma']
 
                 # Train precision
-                Y_train_pred = predict(m_vars['X_batch'],m_opts,m_vars)
+                Y_train_pred = predict(m_opts,m_vars,m_vars['X_batch'])
                 p_scores = precisionAtK(Y_train_pred, m_vars['Y_batch'], m_opts['performance_k'])
                 if m_opts['verbose']:
                     print "Train score:",
@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
             if test_flag:
                 # Test precision computation goes here
-                Y_pred = predict(m_vars['X_test'],m_opts,m_vars)
+                Y_pred = predict(m_opts,m_vars,m_vars['X_test'])
                 p_scores = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
                 nDCG_scores = nDCG_k(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
                 if m_opts['verbose']:
@@ -80,14 +80,7 @@ if __name__ == '__main__':
                         print " %0.4f "%i,
                     print ""
                 m_vars['performance']['prec@k'].append(p_scores)
-
-                Y_pred = predict(m_opts, m_vars, m_vars['X_test'])
-                p_k = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
-                print " Testing -- ",
-                if m_opts['verbose']:
-                    for i in p_k:
-                        print " %0.4f "%i,
-                    print ""
+                m_vars['performance']['ndcg@k'].append(nDCG_scores)
 
         print('Epoch time=%.2f'% (time.time() - start_epoch_t))
 
