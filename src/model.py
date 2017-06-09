@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.linalg as linalg
+import scipy.sparse as ssp
 from scipy.sparse import linalg as sp_linalg
 from scipy.io import loadmat,savemat
 from ops import normalize,sparsify,sigmoid
@@ -15,6 +16,8 @@ def initialize(m_opts):
     data = loadmat(m_opts['dataset'])
     print "Dataset loaded: ",m_opts['dataset']
 
+    # m_vars['Y_train'] = data['Y_tr']
+    # m_vars['X_train'] = data['X_tr']
     m_vars['Y_train'] = sparsify(data['Y_tr'])
     m_vars['X_train'] = sparsify(data['X_tr'])
     m_vars['Y_test'] = sparsify(data['Y_te'])
@@ -32,7 +35,7 @@ def initialize(m_opts):
     m_vars['U'] = m_opts['init_std']*np.random.randn(m_vars['n_users'], m_opts['n_components']).astype(floatX)
     m_vars['U_batch'] = np.zeros((m_opts['batch_size'], m_opts['n_components'])).astype(floatX)
     m_vars['V'] = m_opts['init_std']*np.random.randn(m_vars['n_labels'], m_opts['n_components']).astype(floatX)
-    m_vars['W'] = m_opts['init_W']*np.random.randn(m_opts['n_components'],m_vars['n_features']).astype(floatX)
+    m_vars['W'] = m_opts['init_w']*np.random.randn(m_opts['n_components'],m_vars['n_features']).astype(floatX)
 
     # accumulator of sufficient statistics of label factors
     m_vars['sigma_v'] = np.zeros((m_vars['n_labels'], m_opts['n_components'], m_opts['n_components']))
@@ -41,7 +44,7 @@ def initialize(m_opts):
     m_vars['x_v'] = np.zeros((m_vars['n_labels'], m_opts['n_components']))
 
     # accumulator of sufficient statistics of W matrix
-    m_vars['sigma_W'] = m_opts['lam_w']*np.eye(m_vars['n_features'], m_vars['n_features'])
+    m_vars['sigma_W'] = m_opts['lam_w']*ssp.eye(m_vars['n_features'], m_vars['n_features'], format="csr")
     m_vars['x_W'] = np.zeros((m_vars['n_features'], m_opts['n_components']))
 
     if m_opts['observance']:
@@ -100,7 +103,7 @@ def update_observance(m_opts, m_vars):
     m_vars['mu'] = (1-m_vars['gamma'])*m_vars['mu'] + m_vars['gamma']*mu
 
 def update_W(m_opts, m_vars):
-    sigma = m_vars['X_batch'].T.dot(m_vars['X_batch']) + m_opts['lam_w']*np.eye(m_vars['n_features'])
+    sigma = m_vars['X_batch_T'].dot(m_vars['X_batch']) + m_opts['lam_w']*ssp.eye(m_vars['n_features'], format="csr")
     m_vars['sigma_W'] = (1-m_vars['gamma'])*m_vars['sigma_W'] + m_vars['gamma']*sigma
 
     x = m_vars['X_batch'].T.dot(m_vars['U_batch'])
@@ -111,6 +114,7 @@ def update_W(m_opts, m_vars):
         m_vars['W'] = np.asarray(sigma.dot(m_vars['x_W'])).T
 
     else: # For the CG on the ridge loss to calculate W matrix
+        # assert m_vars['X_batch'].shape[0] == m_vars['U_batch'].shape[0]
         Y = m_vars['x_W']
         X = m_vars['sigma_W']
         for i in range(Y.shape[1]):

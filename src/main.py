@@ -12,8 +12,9 @@ if __name__ == '__main__':
     print 'Model Options:'
     print m_opts
 
-    print 'Model Variables:'
+    print "Initializing model..."
     m_vars = initialize(m_opts)
+    print "Model initialized, beginning training."
     # print m_vars
     
     iter_idx = -1
@@ -25,6 +26,7 @@ if __name__ == '__main__':
         end_idx.append(m_vars['n_users'])
     lr = m_opts['lr_alpha']*(1.0 + np.arange(minibatch_count*m_opts['num_epochs']))**(-m_opts['lr_tau'])
     # lr = np.clip(minibatch_count*m_opts['lr_alpha']*lr,1e-10,0.9)
+    # print "Initial gammas:",lr[:10]
 
     if m_opts['save']:
         os.system('mkdir -p checkpoints/'+m_opts['name']+'/')
@@ -45,16 +47,19 @@ if __name__ == '__main__':
 
             m_vars['Y_batch'] = m_vars['Y_train'][lo:hi]
             m_vars['X_batch'] = m_vars['X_train'][lo:hi]
+            m_vars['Y_batch_T'] = m_vars['Y_batch'].T
+            m_vars['X_batch_T'] = m_vars['X_batch'].T
             m_vars['gamma'] = lr[iter_idx]
 
+            print "Iter no.: ",iter_idx,
+            print "\tGamma : %6g"%m_vars['gamma']
+
             # Updates go here
-            print "gamma: ", lr[iter_idx], 
+            # print "gamma: ", lr[iter_idx], 
             m_vars = update(m_opts, m_vars)
             m_vars['U'][lo:hi] = m_vars['U_batch'] #copying updated user factors of minibatch to global user factor matrix
 
             if display_flag:
-                print "Iter no.: ",iter_idx,
-                print "\tGamma : %6g"%m_vars['gamma']
 
                 # Train precision
                 Y_train_pred = predict(m_opts,m_vars,m_vars['X_batch'])
