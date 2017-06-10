@@ -34,6 +34,8 @@ if __name__ == '__main__':
     for epoch_idx in range(m_opts['num_epochs']):
         print "Epoch #%d"%epoch_idx
         start_epoch_t = time.time()
+        update_time = 0
+        test_time = 0
 
         if m_opts['shuffle_minibatches']:
             shuffle(m_vars['Y_train'],m_vars['X_train'],m_vars['U'],random_state=m_opts['random_state']+epoch_idx)
@@ -51,13 +53,15 @@ if __name__ == '__main__':
             m_vars['X_batch_T'] = m_vars['X_batch'].T
             m_vars['gamma'] = lr[iter_idx]
 
-            print "Iter no.: ",iter_idx,
-            print "\tGamma : %6g"%m_vars['gamma']
+            print "Iter:",iter_idx,
+            print "\tGamma: %6g"%m_vars['gamma'],
+            print "\tUpdate Time: %.3f seconds"%update_time
 
             # Updates go here
-            # print "gamma: ", lr[iter_idx], 
+            start_iter_t = time.time()
             m_vars = update(m_opts, m_vars)
             m_vars['U'][lo:hi] = m_vars['U_batch'] #copying updated user factors of minibatch to global user factor matrix
+            update_time = time.time() - start_iter_t
 
             if display_flag:
 
@@ -72,14 +76,17 @@ if __name__ == '__main__':
 
             if test_flag:
                 # Test precision computation goes here
+                start_test_t = time.time()
                 Y_pred = predict(m_opts,m_vars,m_vars['X_test'])
+                test_time = time.time() - start_test_t
+
                 p_scores = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
                 nDCG_scores = nDCG_k(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
                 if m_opts['verbose']:
                     print "Test score:",
                     for i in p_scores:
                         print " %0.4f "%i,
-                    print ""
+                    print "\t (%.3f seconds)"%test_time
                     print "Test nDCG score:",
                     for i in nDCG_scores:
                         print " %0.4f "%i,

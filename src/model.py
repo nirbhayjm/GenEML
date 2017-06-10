@@ -67,14 +67,16 @@ def update(m_opts, m_vars):
     return m_vars
 
 def update_U(m_opts, m_vars):
-    for i in range(m_opts['batch_size']):
-        for it in range(m_opts['PG_iters']):
-            P_i, N_i = E_xi_omega_row(i, m_opts, m_vars) # expectation of xi_{nl} for n = i, expecation of omega_{nl} for n = i
-            K_i = PG_row(i, m_opts, m_vars) # polyagamma kappa_{nl} for n = i
-            PN_i = P_i*N_i
-            PK_i = P_i*K_i
-            PN_i = PN_i[:,np.newaxis]
+    for it in range(m_opts['PG_iters']):
+        P, N = E_x_omega_row(m_opts, m_vars) # expectation of xi_{nl} for n = i, expecation of omega_{nl} for n = i
+        Kappa = PG_row(m_opts, m_vars) # polyagamma kappa_{nl} for n = i
+        PN = P*N
+        PK = P*Kappa
 
+        for i in range(m_opts['batch_size']):
+            PN_i = PN[i][:,np.newaxis]
+            PK_i = PK[i]
+        
             sigma = m_vars['V'].T.dot(PN_i*m_vars['V']) + m_opts['lam_u']*np.eye(m_opts['n_components'])
             x = m_vars['V'].T.dot(PK_i) + np.asarray((m_opts['lam_u']*m_vars['W']).dot(m_vars['X_batch'][i].todense().T)).reshape(-1)
             # z = np.asarray(z).reshape(-1)
@@ -82,12 +84,14 @@ def update_U(m_opts, m_vars):
             m_vars['U_batch'][i] = linalg.solve(sigma, x)
 
 def update_V(m_opts, m_vars):
+    P, N = E_x_omega_col(m_opts, m_vars) # expectation of xi_{nl} for n = i, expecation of omega_{nl} for n = i
+    Kappa = PG_col(m_opts, m_vars) # polyagamma kappa_{nl} for n = i
+    PN = P*N
+    PK = P*Kappa
+
     for i in range(m_vars['n_labels']):
-        P_i, N_i = E_xi_omega_col(i, m_opts, m_vars) # expectation of xi_{nl} for l = i, expecation of omega_{nl} for l = i 
-        K_i = PG_col(i, m_opts, m_vars) # polyagamma kappa_{nl} for l = i
-        PN_i = P_i*N_i
-        PK_i = P_i*K_i
-        PN_i = PN_i[:,np.newaxis]
+        PN_i = PN[i][:,np.newaxis]
+        PK_i = PK[i]
 
         sigma = m_vars['U_batch'].T.dot(PN_i*m_vars['U_batch'])# + m_opts['lam_v']*np.eye(m_opts['n_components'])
         x = m_vars['U_batch'].T.dot(PK_i)
@@ -97,7 +101,7 @@ def update_V(m_opts, m_vars):
         m_vars['V'][i] = linalg.solve(m_vars['sigma_v'][i], m_vars['x_v'][i])
 
 def update_observance(m_opts, m_vars):
-    P = E_xi(m_opts, m_vars)
+    P = E_x(m_opts, m_vars)
     P = P.sum(axis=0) # sum along column
     mu = (m_vars['a']+P-1)/(m_vars['a']+m_vars['b']+m_opts['batch_size']-2)
     m_vars['mu'] = (1-m_vars['gamma'])*m_vars['mu'] + m_vars['gamma']*mu
@@ -124,47 +128,55 @@ def update_W(m_opts, m_vars):
                 print "WARNING: sp_linalg.cg info: illegal input or breakdown"
             m_vars['W'][i, :] = w.T
 
-def E_xi_omega_row(row_no, m_opts, m_vars):
+def E_x_omega_row(m_opts, m_vars):
     # sigmoid = lambda x: 1/(1+np.exp(-x))
-    PSI = m_vars['U_batch'][row_no].dot(m_vars['V'].T)
+    # PSI = m_vars['U_batch'][row_no].dot(m_vars['V'].T)
+    PSI = m_vars['U_batch'].dot(m_vars['V'].T)
     E_omega = 0.5*np.tanh(0.5*PSI)/(EPS+PSI)
     # PSI = -PSI
     # PSI = np.clip(PSI, -39, np.inf)
     PSI_sigmoid = sigmoid(-PSI)
-    E_xi = (m_vars['mu']*PSI_sigmoid)/(EPS+m_vars['mu']*PSI_sigmoid+(1.-m_vars['mu']))
+    # print "mu shape:",m_vars['mu'].shape
+    # print "PSI_sigmoid shape:",PSI_sigmoid.shape
+    E_x = (m_vars['mu']*PSI_sigmoid)/(EPS+m_vars['mu']*PSI_sigmoid+(1.-m_vars['mu']))
 
-    E_xi[m_vars['Y_batch'][row_no].nonzero()[1]] = 1.
-    return E_xi, E_omega
+    E_x[m_vars['Y_batch'].nonzero()] = 1.
+    return E_x, E_omega
 
-def PG_row(row_no, m_opts, m_vars):
-    PG = m_vars['Y_batch'][row_no].todense()-0.5
-    return np.array(PG).reshape(-1)
+def PG_row(m_opts, m_vars):
+    PG = m_vars['Y_batch'].todense()-0.5
+    return np.array(PG) #.reshape(-1)
 
-def E_xi_omega_col(col_no, m_opts, m_vars):
+def E_x_omega_col(m_opts, m_vars):
     # sigmoid = lambda x: 1/(1+np.exp(-x))
-    PSI = m_vars['V'][col_no].dot(m_vars['U_batch'].T)
+    PSI = m_vars['V'].dot(m_vars['U_batch'].T)
     E_omega = 0.5*np.tanh(0.5*PSI)/(EPS+PSI)
     # PSI = -PSI
     # PSI = np.clip(PSI, -39, np.inf)
     PSI_sigmoid = sigmoid(-PSI)
-    E_xi = (m_vars['mu'][col_no]*PSI_sigmoid)/(EPS+m_vars['mu'][col_no]*PSI_sigmoid+(1.-m_vars['mu'][col_no]))
+    # E_x = (m_vars['mu'][col_no]*PSI_sigmoid)/(EPS+m_vars['mu'][col_no]*PSI_sigmoid+(1.-m_vars['mu'][col_no]))
+    # print "mu shape:",m_vars['mu'].shape
+    # print "PSI_sigmoid shape:",PSI_sigmoid.shape
+    mu_temp = m_vars['mu'][:,np.newaxis]
+    E_x = (mu_temp*PSI_sigmoid)/(EPS+mu_temp*PSI_sigmoid+(1.-mu_temp))
 
-    E_xi[m_vars['Y_batch'][:,col_no].nonzero()[0]] = 1.
-    return E_xi, E_omega
+    E_x[m_vars['Y_batch_T'].nonzero()] = 1.
+    return E_x, E_omega
 
-def PG_col(col_no, m_opts, m_vars):
-    PG = m_vars['Y_batch'][:,col_no].todense()-0.5
-    return np.array(PG).reshape(-1)
+def PG_col(m_opts, m_vars):
+    # PG = m_vars['Y_batch'][:,col_no].todense()-0.5
+    PG = m_vars['Y_batch_T'].todense()-0.5
+    return np.array(PG)
 
-def E_xi(m_opts, m_vars):
+def E_x(m_opts, m_vars):
     # sigmoid = lambda x: 1/(1+np.exp(-x))
     PSI = m_vars['U_batch'].dot(m_vars['V'].T)
     # PSI = -PSI
     # PSI = np.clip(PSI, -39, np.inf)
     PSI_sigmoid = sigmoid(-PSI)
-    E_xi = (m_vars['mu']*PSI_sigmoid)/(EPS+m_vars['mu']*PSI_sigmoid+(1.-m_vars['mu']))
-    E_xi[m_vars['Y_batch'].nonzero()] = 1.
-    return E_xi
+    E_x = (m_vars['mu']*PSI_sigmoid)/(EPS+m_vars['mu']*PSI_sigmoid+(1.-m_vars['mu']))
+    E_x[m_vars['Y_batch'].nonzero()] = 1.
+    return E_x
 
 def predict(m_opts, m_vars, X):
     # sigmoid = lambda x: 1/(1+np.exp(-x))
