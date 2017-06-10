@@ -22,8 +22,8 @@ if __name__ == '__main__':
     end_idx = start_idx[1:]
 
     minibatch_count = m_vars['n_users']//m_opts['batch_size']
-    if minibatch_count == len(start_idx):
-    	end_idx.append(m_vars['n_users'])
+    # if minibatch_count == len(start_idx):
+    end_idx.append(m_vars['n_users'])
     lr = m_opts['lr_alpha']*(1.0 + np.arange(minibatch_count*m_opts['num_epochs']))**(-m_opts['lr_tau'])
     # lr = np.clip(minibatch_count*m_opts['lr_alpha']*lr,1e-10,0.9)
 
@@ -37,7 +37,7 @@ if __name__ == '__main__':
         if m_opts['shuffle_minibatches']:
             shuffle(m_vars['Y_train'],m_vars['X_train'],m_vars['U'],random_state=m_opts['random_state']+epoch_idx)
 
-        for minibatch_idx in range(minibatch_count):
+        for minibatch_idx in range(len(start_idx)):
             iter_idx += 1
 
             display_flag = (iter_idx+1)%m_opts['display_interval'] == 0
@@ -46,6 +46,8 @@ if __name__ == '__main__':
 
             m_vars['Y_batch'] = m_vars['Y_train'][lo:hi]
             m_vars['X_batch'] = m_vars['X_train'][lo:hi]
+            m_vars['Y_batch_T'] = m_vars['Y_batch'].T
+            m_vars['X_batch_T'] = m_vars['X_batch'].T
             m_vars['gamma'] = lr[iter_idx]
 
             # Updates go here
@@ -76,10 +78,10 @@ if __name__ == '__main__':
         print('Epoch time=%.2f'% (time.time() - start_epoch_t))
 
         # print m_vars['mu']
-        data = loadmat("../data/synth_data.mat")
+        # data = loadmat("../data/synth_data.mat")
         # print data['mu']
-        for i in range(len(m_vars['mu'])):
-            print "%0.2f, %.2f" %(m_vars['mu'][i], data['mu'][0][i])
+        # for i in range(len(m_vars['mu'])):
+        #     print "%0.2f, %.2f" %(m_vars['mu'][i], data['mu'][0][i])
 
         # Saving at the end of each epoch goes here.
         if m_opts['save']:
