@@ -15,7 +15,7 @@ def argparser():
     parser.add_argument('-shuffle_minibatches', action='store_true')
     # parser.add_argument('-save_dir', type=str, default="./")
     # parser.add_argument('-save_interval', type=int, default=25)
-    parser.add_argument('-save', type=bool, default=True)
+    parser.add_argument('-save', action='store_true')
     parser.add_argument('-display_interval', type=int, default=1)
     parser.add_argument('-test_interval', type=int, default=1)
     parser.add_argument('-v','--verbose', action='store_true')

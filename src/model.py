@@ -114,6 +114,8 @@ def update_W(m_opts, m_vars):
     m_vars['x_W'] = (1-m_vars['gamma'])*m_vars['x_W'] + m_vars['gamma']*x
 
     if m_opts['use_cg'] != True: # For the Ridge regression on W matrix with the closed form solutions 
+        if ssp.issparse(m_vars['sigma_W']):
+            m_vars['sigma_W'] = m_vars['sigma_W'].todense()
         sigma = linalg.inv(m_vars['sigma_W']) # O(N^3) time for N x N matrix inversion 
         m_vars['W'] = np.asarray(sigma.dot(m_vars['x_W'])).T
 
