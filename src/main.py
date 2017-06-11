@@ -2,7 +2,7 @@ import numpy as np
 from model import initialize,update,saver,predict
 from ops import normalize,sparsify,shuffle
 from inputs import argparser
-from evaluation import precisionAtK,nDCG_k
+from evaluation import *
 
 import time
 import os
@@ -77,22 +77,27 @@ if __name__ == '__main__':
             if test_flag:
                 # Test precision computation goes here
                 start_test_t = time.time()
-                Y_pred = predict(m_opts,m_vars,m_vars['X_test'])
-                test_time = time.time() - start_test_t
+                if m_opts['test_chunks'] == 1:
+                    Y_pred = predict(m_opts,m_vars,m_vars['X_test'])
+                    p_scores = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
+                    # nDCG_scores = nDCG_k(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
+                else:
+                    Y_pred_chunks, Y_test_chunks = predict(m_opts,m_vars,m_vars['X_test'],m_opts['test_chunks'])
+                    p_scores = precisionAtKChunks(Y_pred_chunks, Y_test_chunks, m_opts['performance_k'])
 
-                p_scores = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
-                nDCG_scores = nDCG_k(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
+                test_time = time.time() - start_test_t
+                
                 if m_opts['verbose']:
                     print "Test score:",
                     for i in p_scores:
                         print " %0.4f "%i,
                     print "\t (%.3f seconds)"%test_time
-                    print "Test nDCG score:",
-                    for i in nDCG_scores:
-                        print " %0.4f "%i,
-                    print ""
+                    # print "Test nDCG score:",
+                    # for i in nDCG_scores:
+                    #     print " %0.4f "%i,
+                    # print ""
                 m_vars['performance']['prec@k'].append(p_scores)
-                m_vars['performance']['ndcg@k'].append(nDCG_scores)
+                # m_vars['performance']['ndcg@k'].append(nDCG_scores)
 
         print('Epoch time=%.2f'% (time.time() - start_epoch_t))
 

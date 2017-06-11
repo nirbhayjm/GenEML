@@ -20,6 +20,34 @@ def precisionAtK(Y_pred_orig, Y_true_orig, k, verbose=False):
     #     print ""
     return tuple(p[[0,2,4]])
 
+def precisionAtKChunks(Y_pred_orig, Y_true_orig, k,verbose=True):
+    p = np.zeros((len(Y_pred_orig),k))
+    n_total_items = 0
+    n_labels = 0
+    for c,(Y_pred_chunk,Y_true_chunk) in enumerate(zip(Y_pred_orig,Y_true_orig)):
+        prevMatch = 0
+        # print "Computing %dth precision"%c
+        Y_pred = Y_pred_chunk.copy()
+        Y_true = Y_true_chunk.copy()
+        n_items, n_labels = Y_pred.shape
+        n_total_items += n_items
+        for i in xrange(1,k+1):
+            Jidx = np.argmax(Y_pred,1)
+            prevMatch += Y_true[np.arange(n_items),Jidx].sum()
+            Y_pred[np.arange(n_items),Jidx] = -np.inf
+            p[c,i-1] = prevMatch #/(i*n_items)
+
+    q = np.zeros(k)
+    # print "q:",
+    for i in range(1,k+1):
+        q[i-1] = p[:,i-1].sum()/(i*n_total_items)
+
+    # if verbose:
+    #     for i in q[[0,2,4]]:
+    #         print " %0.4f "%i,
+    #     print ""
+    return tuple(q[[0,2,4]])
+
 def DCG_k(Y_pred_orig, Y_true_orig, k, verbose=False):
     Y_pred = np.asarray(Y_pred_orig.copy())
     Y_true = Y_true_orig.copy()

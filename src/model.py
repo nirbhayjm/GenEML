@@ -178,14 +178,30 @@ def E_x(m_opts, m_vars):
     E_x[m_vars['Y_batch'].nonzero()] = 1.
     return E_x
 
-def predict(m_opts, m_vars, X):
-    # sigmoid = lambda x: 1/(1+np.exp(-x))
-    U = X.dot(m_vars['W'].T)
-    Y_pred = U.dot(m_vars['V'].T)
-    # Y_pred = np.clip(Y_pred, -39, np.inf)
-    Y_pred = sigmoid(Y_pred)
-    Y_pred = Y_pred*m_vars['mu']
-    return Y_pred
+def predict(m_opts, m_vars, X, break_chunks=1):
+    if break_chunks == 1:
+        # sigmoid = lambda x: 1/(1+np.exp(-x))
+        U = X.dot(m_vars['W'].T)
+        Y_pred = U.dot(m_vars['V'].T)
+        # Y_pred = np.clip(Y_pred, -39, np.inf)
+        Y_pred = sigmoid(Y_pred)
+        Y_pred = Y_pred*m_vars['mu']
+        return Y_pred
+    else:
+        U = ssp.csr_matrix(X.dot(m_vars['W'].T))
+        n_users_test = m_vars['Y_test'].shape[0]
+        chunk_size = n_users_test//break_chunks
+
+        start_idx = range(0,n_users_test,chunk_size)[:break_chunks]
+        end_idx = start_idx[1:] + [n_users_test]
+
+        Y_predict_chunks = [None]*break_chunks
+        Y_test_chunks = [None]*break_chunks
+        for i,(lo,hi) in enumerate(zip(start_idx,end_idx)):
+            Y_predict_chunks[i] = np.asarray(U[lo:hi].dot(m_vars['V'].T))
+            Y_predict_chunks[i] = m_vars['mu']*sigmoid(Y_predict_chunks[i])
+            Y_test_chunks[i] = m_vars['Y_test'][lo:hi]
+        return Y_predict_chunks,Y_test_chunks
 
 def saver(vars_path, m_vars, opts_path, m_opts):
     import pickle
