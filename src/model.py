@@ -29,8 +29,9 @@ def initialize(m_opts):
     m_vars['n_users'],m_vars['n_labels'] = m_vars['Y_train'].shape
     m_vars['n_features'] = m_vars['X_train'].shape[1]
 
-    if m_opts['label_normalize']:
-        normalize(m_vars['Y_train'],norm='l2',axis=1,copy=False)
+    if m_opts['no_feat_normalize'] == False:
+        normalize(m_vars['X_train'],norm='l2',axis=1,copy=False)
+        normalize(m_vars['X_test'],norm='l2',axis=1,copy=False)
 
     m_vars['U'] = m_opts['init_std']*np.random.randn(m_vars['n_users'], m_opts['n_components']).astype(floatX)
     m_vars['U_batch'] = np.zeros((m_opts['batch_size'], m_opts['n_components'])).astype(floatX)
