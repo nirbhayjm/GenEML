@@ -28,6 +28,9 @@ if __name__ == '__main__':
     # lr = np.clip(minibatch_count*m_opts['lr_alpha']*lr,1e-10,0.9)
     # print "Initial gammas:",lr[:10]
 
+    # print minibatch_count
+    # print start_idx, end_idx
+
     if m_opts['save']:
         os.system('mkdir -p checkpoints/'+m_opts['name']+'/')
 

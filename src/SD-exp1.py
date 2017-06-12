@@ -2,11 +2,17 @@ import numpy as np
 from model import initialize,update,saver,predict
 from ops import normalize,sparsify,shuffle
 from inputs import argparser
-from evaluation import precisionAtK
+from evaluation import precisionAtK,AUC
 from scipy.io import loadmat,savemat
 
 import time
 import os
+
+def idx_rare(m_opts, m_vars, num=50):
+    label_sum = m_vars['Y_train'].sum(axis=0)
+    rare_label = np.asarray(label_sum.argsort()).reshape(-1)
+    # print rare_label.shape, rare_label
+    return rare_label[:num]
 
 if __name__ == '__main__':
     m_opts = argparser()
@@ -29,6 +35,12 @@ if __name__ == '__main__':
 
     if m_opts['save']:
         os.system('mkdir -p checkpoints/'+m_opts['name']+'/')
+
+    rare_labels = idx_rare(m_opts, m_vars)
+
+    # rare_labels = np.asarray(rare_labels).reshape(-1)
+
+    # print rare_labels.shape, rare_labels
 
     for epoch_idx in range(m_opts['num_epochs']):
         print "Epoch #%d"%epoch_idx
@@ -66,14 +78,26 @@ if __name__ == '__main__':
                         print " %0.4f "%i,
                     print ""
                 m_vars['performance']['prec@k'].append(p_k)
-
                 Y_pred = predict(m_opts, m_vars, m_vars['X_test'])
-                p_k = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
-                print " Testing -- ",
+                p_k = precisionAtK(Y_pred[:, rare_labels], m_vars['Y_test'][:, rare_labels], m_opts['performance_k'])
+                auc = AUC(Y_pred[:, rare_labels], m_vars['Y_test'][:, rare_labels])
+                print " Testing -- "
+                print "RARE LABELS- precision@k ",
                 if m_opts['verbose']:
                     for i in p_k:
                         print " %0.4f "%i,
-                    print ""
+                print " AUC -- ", auc
+
+                Y_pred = predict(m_opts, m_vars, m_vars['X_test'])
+                p_k = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
+                auc = AUC(Y_pred, m_vars['Y_test'])
+                # print " Testing -- "
+                print "ALL LABELS - precision@k ",
+                if m_opts['verbose']:
+                    for i in p_k:
+                        print " %0.4f "%i,
+                print " AUC -- ", auc
+
 
         print('Epoch time=%.2f'% (time.time() - start_epoch_t))
 

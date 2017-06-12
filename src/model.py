@@ -29,8 +29,9 @@ def initialize(m_opts):
     m_vars['n_users'],m_vars['n_labels'] = m_vars['Y_train'].shape
     m_vars['n_features'] = m_vars['X_train'].shape[1]
 
-    if m_opts['label_normalize']:
-        normalize(m_vars['Y_train'],norm='l2',axis=1,copy=False)
+    if m_opts['no_feat_normalize'] == False:
+        normalize(m_vars['X_train'],norm='l2',axis=1,copy=False)
+        normalize(m_vars['X_test'],norm='l2',axis=1,copy=False)
 
     # m_vars['U'] = m_opts['init_std']*np.random.randn(m_vars['n_users'], m_opts['n_components']).astype(floatX)
     m_vars['U_batch'] = np.zeros((m_opts['batch_size'], m_opts['n_components'])).astype(floatX)
@@ -143,7 +144,8 @@ def update_W(m_opts, m_vars):
         m_vars['x_W'] = (1-m_vars['gamma'])*m_vars['x_W'] + m_vars['gamma']*x
 
     if m_opts['use_cg'] != True: # For the Ridge regression on W matrix with the closed form solutions
-        raise NotImplemented 
+        if ssp.issparse(m_vars['sigma_W']):
+            m_vars['sigma_W'] = m_vars['sigma_W'].todense()
         sigma = linalg.inv(m_vars['sigma_W']) # O(N^3) time for N x N matrix inversion 
         m_vars['W'] = np.asarray(sigma.dot(m_vars['x_W'])).T
     else: # For the CG on the ridge loss to calculate W matrix
