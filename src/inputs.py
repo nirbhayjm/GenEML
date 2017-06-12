@@ -30,7 +30,7 @@ def argparser():
     parser.add_argument('-lam_u', type=float, default=1e-3)
     parser.add_argument('-lam_v', type=float, default=1e-3)
     parser.add_argument('-lam_w', type=float, default=1e-4)
-    parser.add_argument('-label_normalize', action='store_true')
+    parser.add_argument('-no_feat_normalize', action='store_true')
     parser.add_argument('-use_cg', action='store_true')
     parser.add_argument('-cg_iters', type=int, default=5)
     parser.add_argument('-PG_iters', type=int, default=1)

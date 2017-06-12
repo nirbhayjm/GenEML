@@ -1,15 +1,14 @@
 import sklearn
 import numpy as np
 
-def normalize(M):
+def normalize(M, norm='l2', axis=1, copy=False):
     '''
     Normalize
     ----------
     In-place row normalization of a 2D matrix M.
 
     '''
-    if self.normalize_labels:
-        sklearn.preprocessing.normalize(M,norm='l2',axis=1,copy=False)
+    sklearn.preprocessing.normalize(M,norm='l2',axis=1,copy=False)
     return
 
 def sparsify(Y):
