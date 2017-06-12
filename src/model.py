@@ -32,19 +32,22 @@ def initialize(m_opts):
     if m_opts['label_normalize']:
         normalize(m_vars['Y_train'],norm='l2',axis=1,copy=False)
 
-    m_vars['U'] = m_opts['init_std']*np.random.randn(m_vars['n_users'], m_opts['n_components']).astype(floatX)
+    # m_vars['U'] = m_opts['init_std']*np.random.randn(m_vars['n_users'], m_opts['n_components']).astype(floatX)
     m_vars['U_batch'] = np.zeros((m_opts['batch_size'], m_opts['n_components'])).astype(floatX)
     m_vars['V'] = m_opts['init_std']*np.random.randn(m_vars['n_labels'], m_opts['n_components']).astype(floatX)
     m_vars['W'] = m_opts['init_w']*np.random.randn(m_opts['n_components'],m_vars['n_features']).astype(floatX)
 
     # accumulator of sufficient statistics of label factors
-    m_vars['sigma_v'] = np.zeros((m_vars['n_labels'], m_opts['n_components'], m_opts['n_components']))
+    # m_vars['sigma_v'] = np.zeros((m_vars['n_labels'], m_opts['n_components'], m_opts['n_components']))
+    m_vars['sigma_v'] = [None]*m_vars['n_labels']
     for i in range(m_vars['n_labels']):
-        m_vars['sigma_v'][i] = m_opts['lam_v']*np.eye(m_opts['n_components'])
+        # m_vars['sigma_v'][i] = m_opts['lam_v']*np.eye(m_opts['n_components'])
+        m_vars['sigma_v'][i] = m_opts['lam_v']*ssp.eye(m_opts['n_components'],format="csr")
     m_vars['x_v'] = np.zeros((m_vars['n_labels'], m_opts['n_components']))
 
     # accumulator of sufficient statistics of W matrix
     m_vars['sigma_W'] = m_opts['lam_w']*ssp.eye(m_vars['n_features'], m_vars['n_features'], format="csr")
+    # m_vars['sigma_W'] = m_opts['lam_w']*np.eye(m_vars['n_features'])
     m_vars['x_W'] = np.zeros((m_vars['n_features'], m_opts['n_components']))
 
     if m_opts['observance']:
@@ -54,7 +57,7 @@ def initialize(m_opts):
     else:
         m_vars['mu'] = np.ones(m_vars['n_labels']).astype(floatX)
 
-    m_vars['performance'] = {'prec@k':[], 'dcg@k':[], 'ndcg@k':[]} # storing the performance measures along iterations
+    # m_vars['performance'] = {'prec@k':[], 'dcg@k':[], 'ndcg@k':[]} # storing the performance measures along iterations
 
     return m_vars
 
@@ -64,6 +67,29 @@ def update(m_opts, m_vars):
     if m_opts['observance']:
         update_observance(m_opts, m_vars)
     update_W(m_opts, m_vars)
+
+    # '''Monitoring the size of model variables'''
+    # import sys
+
+    # def mysize(obj):
+    #     if "nbytes" in dir(obj):
+    #         return obj.nbytes
+    #     elif "size" in dir(obj):
+    #         return obj.size*8 # Assuming 8 bytes per unit (float64, int64)
+    #     elif type(obj) is list:
+    #         size = 0
+    #         for item in obj:
+    #             size += mysize(item)
+    #         return size
+    #     else:
+    #         return sys.getsizeof(obj)
+
+    # for var_name in m_vars:
+    #     var_size = mysize(m_vars[var_name])
+    #     if var_size > 1e6:
+    #         print "[",var_name,":","%g MB"%((1.0*var_size)/(1024*1024)),"], "
+    # '''END'''
+
     return m_vars
 
 def update_U(m_opts, m_vars):
@@ -107,27 +133,60 @@ def update_observance(m_opts, m_vars):
     m_vars['mu'] = (1-m_vars['gamma'])*m_vars['mu'] + m_vars['gamma']*mu
 
 def update_W(m_opts, m_vars):
+    print "Updating W"
     sigma = m_vars['X_batch_T'].dot(m_vars['X_batch']) + m_opts['lam_w']*ssp.eye(m_vars['n_features'], format="csr")
     m_vars['sigma_W'] = (1-m_vars['gamma'])*m_vars['sigma_W'] + m_vars['gamma']*sigma
 
     x = m_vars['X_batch'].T.dot(m_vars['U_batch'])
     m_vars['x_W'] = (1-m_vars['gamma'])*m_vars['x_W'] + m_vars['gamma']*x
 
-    if m_opts['use_cg'] != True: # For the Ridge regression on W matrix with the closed form solutions 
+    if m_opts['use_cg'] != True: # For the Ridge regression on W matrix with the closed form solutions
+        raise NotImplemented 
         sigma = linalg.inv(m_vars['sigma_W']) # O(N^3) time for N x N matrix inversion 
         m_vars['W'] = np.asarray(sigma.dot(m_vars['x_W'])).T
 
     else: # For the CG on the ridge loss to calculate W matrix
         # assert m_vars['X_batch'].shape[0] == m_vars['U_batch'].shape[0]
-        Y = m_vars['x_W']
-        X = m_vars['sigma_W']
-        for i in range(Y.shape[1]):
-            y = Y[:, i]
-            w,info = sp_linalg.cg(X, y, x0=m_vars['W'][i,:], maxiter=m_opts['cg_iters'])
-            if info < 0:
-                print "WARNING: sp_linalg.cg info: illegal input or breakdown"
-            m_vars['W'][i, :] = w.T
+        # X = m_vars['sigma_W']
+        # for i in range(m_opts['n_components']):
+        #     y = m_vars['x_W'][:, i]
+        #     w,info = sp_linalg.cg(X, y, x0=m_vars['W'][i,:], maxiter=m_opts['cg_iters'])
+        #     if info < 0:
+        #         print "WARNING: sp_linalg.cg info: illegal input or breakdown"
+        #     m_vars['W'][i, :] = w.T
 
+        ''' Solving X*W' = U '''
+        lr = 1e-3*(1.0 + np.arange(m_opts['cg_iters']*10))**(-0.5)
+        for iter_idx in range(m_opts['cg_iters']*10):
+            # print "On CG Iter %d"%iter_idx
+            # print "Shapes:"
+            # print "W:",m_vars['W'].shape, type(m_vars['W'])
+            # print "X_batch_T:",m_vars['X_batch_T'].shape, type(m_vars['X_batch_T'])
+            # print "U_batch:",m_vars['U_batch'].shape, type(m_vars['U_batch'])
+            # assert False
+
+            # # grad = (m_vars['W'].T.dot(m_vars['X_batch']) - m_vars['U_batch'].T).dot(m_vars['X_batch'])
+            # print "foo1"
+            # # grad = (m_vars['W'].dot(m_vars['X_batch'].T))
+            # grad = m_vars['X_batch'].dot(m_vars['W'].T)
+            # print "foo1.5"
+            # # grad = grad - (m_vars['U_batch'].T).dot(m_vars['X_batch'])
+            # grad = grad - m_vars['U_batch']
+            # print "foo2"
+            # # grad = grad.dot(m_vars['X_batch'])
+            # grad = m_vars['X_batch_T'].dot(grad)
+            # # print "foo3"
+            # # grad = lr[iter_idx]*(grad + m_opts['lam_w']*m_vars['W']) 
+            # grad = lr[iter_idx]*(grad.T + m_opts['lam_w']*m_vars['W']) 
+            # # print "foo4"
+            # m_vars['W'] = m_vars['W'] - grad
+            # print "foo5"
+
+            grad = m_vars['X_batch_T'].dot(m_vars['X_batch'].dot(m_vars['W'].T) - m_vars['U_batch'])
+            grad = lr[iter_idx]*(grad.T + m_opts['lam_w']*m_vars['W'])
+            m_vars['W'] = m_vars['W'] - grad
+
+        
 def E_x_omega_row(m_opts, m_vars):
     # sigmoid = lambda x: 1/(1+np.exp(-x))
     # PSI = m_vars['U_batch'][row_no].dot(m_vars['V'].T)

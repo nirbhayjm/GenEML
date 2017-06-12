@@ -38,7 +38,8 @@ if __name__ == '__main__':
         test_time = 0
 
         if m_opts['shuffle_minibatches']:
-            shuffle(m_vars['Y_train'],m_vars['X_train'],m_vars['U'],random_state=m_opts['random_state']+epoch_idx)
+            # shuffle(m_vars['Y_train'],m_vars['X_train'],m_vars['U'],random_state=m_opts['random_state']+epoch_idx)
+            shuffle(m_vars['Y_train'],m_vars['X_train'],random_state=m_opts['random_state']+epoch_idx)
 
         for minibatch_idx in range(minibatch_count):
             iter_idx += 1
@@ -60,7 +61,7 @@ if __name__ == '__main__':
             # Updates go here
             start_iter_t = time.time()
             m_vars = update(m_opts, m_vars)
-            m_vars['U'][lo:hi] = m_vars['U_batch'] #copying updated user factors of minibatch to global user factor matrix
+            # m_vars['U'][lo:hi] = m_vars['U_batch'] #copying updated user factors of minibatch to global user factor matrix
             update_time = time.time() - start_iter_t
 
             if display_flag:
@@ -96,7 +97,7 @@ if __name__ == '__main__':
                     # for i in nDCG_scores:
                     #     print " %0.4f "%i,
                     # print ""
-                m_vars['performance']['prec@k'].append(p_scores)
+                # m_vars['performance']['prec@k'].append(p_scores)
                 # m_vars['performance']['ndcg@k'].append(nDCG_scores)
 
         print('Epoch time=%.2f'% (time.time() - start_epoch_t))

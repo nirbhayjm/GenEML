@@ -19,8 +19,8 @@ def sparsify(Y):
         Y = ssp.csr_matrix(Y)
     return Y
 
-def shuffle(X, Y, Z, random_state):
-    sklearn.utils.shuffle(X,Y,Z,random_state=random_state)
+def shuffle(X, Y, random_state):
+    sklearn.utils.shuffle(X,Y,random_state=random_state)
 
 def sigmoid(x):
     y = np.clip(x, -20, np.inf)
