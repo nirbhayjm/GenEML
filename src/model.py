@@ -45,10 +45,11 @@ def initialize(m_opts):
         m_vars['sigma_v'][i] = m_opts['lam_v']*ssp.eye(m_opts['n_components'],format="csr")
     m_vars['x_v'] = np.zeros((m_vars['n_labels'], m_opts['n_components']))
 
-    # accumulator of sufficient statistics of W matrix
-    m_vars['sigma_W'] = m_opts['lam_w']*ssp.eye(m_vars['n_features'], m_vars['n_features'], format="csr")
-    # m_vars['sigma_W'] = m_opts['lam_w']*np.eye(m_vars['n_features'])
-    m_vars['x_W'] = np.zeros((m_vars['n_features'], m_opts['n_components']))
+    if not m_opts['use_grad']:
+        # accumulator of sufficient statistics of W matrix
+        m_vars['sigma_W'] = m_opts['lam_w']*ssp.eye(m_vars['n_features'], m_vars['n_features'], format="csr")
+        # m_vars['sigma_W'] = m_opts['lam_w']*np.eye(m_vars['n_features'])
+        m_vars['x_W'] = np.zeros((m_vars['n_features'], m_opts['n_components']))
 
     if m_opts['observance']:
         m_vars['a'],m_vars['b'] = m_opts['init_mu_a'],m_opts['init_mu_b']
@@ -133,58 +134,36 @@ def update_observance(m_opts, m_vars):
     m_vars['mu'] = (1-m_vars['gamma'])*m_vars['mu'] + m_vars['gamma']*mu
 
 def update_W(m_opts, m_vars):
-    print "Updating W"
-    sigma = m_vars['X_batch_T'].dot(m_vars['X_batch']) + m_opts['lam_w']*ssp.eye(m_vars['n_features'], format="csr")
-    m_vars['sigma_W'] = (1-m_vars['gamma'])*m_vars['sigma_W'] + m_vars['gamma']*sigma
+    # print "Updating W"
+    if not m_opts['use_grad']:
+        sigma = m_vars['X_batch_T'].dot(m_vars['X_batch']) + m_opts['lam_w']*ssp.eye(m_vars['n_features'], format="csr")
+        m_vars['sigma_W'] = (1-m_vars['gamma'])*m_vars['sigma_W'] + m_vars['gamma']*sigma
 
-    x = m_vars['X_batch'].T.dot(m_vars['U_batch'])
-    m_vars['x_W'] = (1-m_vars['gamma'])*m_vars['x_W'] + m_vars['gamma']*x
+        x = m_vars['X_batch'].T.dot(m_vars['U_batch'])
+        m_vars['x_W'] = (1-m_vars['gamma'])*m_vars['x_W'] + m_vars['gamma']*x
 
     if m_opts['use_cg'] != True: # For the Ridge regression on W matrix with the closed form solutions
         raise NotImplemented 
         sigma = linalg.inv(m_vars['sigma_W']) # O(N^3) time for N x N matrix inversion 
         m_vars['W'] = np.asarray(sigma.dot(m_vars['x_W'])).T
-
     else: # For the CG on the ridge loss to calculate W matrix
-        # assert m_vars['X_batch'].shape[0] == m_vars['U_batch'].shape[0]
-        # X = m_vars['sigma_W']
-        # for i in range(m_opts['n_components']):
-        #     y = m_vars['x_W'][:, i]
-        #     w,info = sp_linalg.cg(X, y, x0=m_vars['W'][i,:], maxiter=m_opts['cg_iters'])
-        #     if info < 0:
-        #         print "WARNING: sp_linalg.cg info: illegal input or breakdown"
-        #     m_vars['W'][i, :] = w.T
-
-        ''' Solving X*W' = U '''
-        lr = 1e-3*(1.0 + np.arange(m_opts['cg_iters']*10))**(-0.5)
-        for iter_idx in range(m_opts['cg_iters']*10):
-            # print "On CG Iter %d"%iter_idx
-            # print "Shapes:"
-            # print "W:",m_vars['W'].shape, type(m_vars['W'])
-            # print "X_batch_T:",m_vars['X_batch_T'].shape, type(m_vars['X_batch_T'])
-            # print "U_batch:",m_vars['U_batch'].shape, type(m_vars['U_batch'])
-            # assert False
-
-            # # grad = (m_vars['W'].T.dot(m_vars['X_batch']) - m_vars['U_batch'].T).dot(m_vars['X_batch'])
-            # print "foo1"
-            # # grad = (m_vars['W'].dot(m_vars['X_batch'].T))
-            # grad = m_vars['X_batch'].dot(m_vars['W'].T)
-            # print "foo1.5"
-            # # grad = grad - (m_vars['U_batch'].T).dot(m_vars['X_batch'])
-            # grad = grad - m_vars['U_batch']
-            # print "foo2"
-            # # grad = grad.dot(m_vars['X_batch'])
-            # grad = m_vars['X_batch_T'].dot(grad)
-            # # print "foo3"
-            # # grad = lr[iter_idx]*(grad + m_opts['lam_w']*m_vars['W']) 
-            # grad = lr[iter_idx]*(grad.T + m_opts['lam_w']*m_vars['W']) 
-            # # print "foo4"
-            # m_vars['W'] = m_vars['W'] - grad
-            # print "foo5"
-
-            grad = m_vars['X_batch_T'].dot(m_vars['X_batch'].dot(m_vars['W'].T) - m_vars['U_batch'])
-            grad = lr[iter_idx]*(grad.T + m_opts['lam_w']*m_vars['W'])
-            m_vars['W'] = m_vars['W'] - grad
+        if not m_opts['use_grad']:
+            # assert m_vars['X_batch'].shape[0] == m_vars['U_batch'].shape[0]
+            X = m_vars['sigma_W']
+            for i in range(m_opts['n_components']):
+                y = m_vars['x_W'][:, i]
+                w,info = sp_linalg.cg(X, y, x0=m_vars['W'][i,:], maxiter=m_opts['cg_iters'])
+                if info < 0:
+                    print "WARNING: sp_linalg.cg info: illegal input or breakdown"
+                m_vars['W'][i, :] = w.T
+        else:
+            ''' Solving X*W' = U '''
+            print "Using grad!"
+            lr = 1e-3*(1.0 + np.arange(m_opts['cg_iters']*10))**(-0.75)
+            for iter_idx in range(m_opts['cg_iters']*10):
+                grad = m_vars['X_batch_T'].dot(m_vars['X_batch'].dot(m_vars['W'].T) - m_vars['U_batch'])
+                grad = lr[iter_idx]*(grad.T + m_opts['lam_w']*m_vars['W'])
+                m_vars['W'] = m_vars['W'] - grad
 
         
 def E_x_omega_row(m_opts, m_vars):
