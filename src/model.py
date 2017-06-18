@@ -29,6 +29,9 @@ def initialize(m_opts):
     m_vars['n_users'],m_vars['n_labels'] = m_vars['Y_train'].shape
     m_vars['n_features'] = m_vars['X_train'].shape[1]
 
+    if m_opts['label_normalize']:
+        normalize(m_vars['Y_train'],norm='l2',axis=1,copy=False)
+
     if m_opts['no_feat_normalize'] == False:
         normalize(m_vars['X_train'],norm='l2',axis=1,copy=False)
         normalize(m_vars['X_test'],norm='l2',axis=1,copy=False)
@@ -160,13 +163,43 @@ def update_W(m_opts, m_vars):
                 m_vars['W'][i, :] = w.T
         else:
             ''' Solving X*W' = U '''
-            print "Using grad!"
-            lr = 1e-3*(1.0 + np.arange(m_opts['cg_iters']*10))**(-0.75)
-            for iter_idx in range(m_opts['cg_iters']*10):
-                grad = m_vars['X_batch_T'].dot(m_vars['X_batch'].dot(m_vars['W'].T) - m_vars['U_batch'])
-                grad = lr[iter_idx]*(grad.T + m_opts['lam_w']*m_vars['W'])
-                m_vars['W'] = m_vars['W'] - grad
+            # print "Using grad!"
+            my_invert = lambda x: x if x<1 else 1.0/x
+            l2_norm = lambda x: np.sqrt((x**2).sum())
+            def clip_by_norm(x, clip_max):
+                x_norm = l2_norm(x)
+                if x_norm > clip_max:
+                    # print "Clipped!",clip_max
+                    x = clip_max*(x/x_norm)
+                return x
 
+            lr = m_opts['grad_alpha']*(1.0 + np.arange(m_opts['cg_iters']*10))**(-0.9) #(-0.75)
+            try:
+                W_old = m_vars['W'].copy()
+                tail_norm, curr_norm = 1.0,1.0
+                for iter_idx in range(m_opts['cg_iters']*10):
+                    grad = m_vars['X_batch_T'].dot(m_vars['X_batch'].dot(m_vars['W'].T) - m_vars['U_batch'])
+                    grad = lr[iter_idx]*(grad.T + m_opts['lam_w']*m_vars['W'])
+                    # m_vars['W'] = m_vars['W'] - np.clip(grad,-1e6,1e6)
+                    tail_norm = 0.5*curr_norm + (1-0.5)*tail_norm
+                    curr_norm = l2_norm(grad)
+                    if curr_norm < 1e-15:
+                        return
+                    elif iter_idx > 10 and my_invert(np.abs(tail_norm/curr_norm)) > 0.8:
+                        # print "Halved!"
+                        lr = lr/2.0
+
+                    m_vars['W'] = m_vars['W'] - clip_by_norm(grad, 1e0) # Clip by norm
+                    # print "[%d]grad_avg:%g"%(iter_idx,np.abs(grad).sum()/grad.size)
+                    # print "[%d]grad_l2_norm:%g"%(iter_idx,curr_norm)
+
+                # Delta_W = np.abs(m_vars['W']-W_old).sum()/W_old.size
+                Delta_W = l2_norm(m_vars['W']-W_old)
+                # print "Delta_W:%g"%Delta_W
+            except FloatingPointError:
+                print "FloatingPointError in:"
+                print grad
+                assert False
         
 def E_x_omega_row(m_opts, m_vars):
     # sigmoid = lambda x: 1/(1+np.exp(-x))
@@ -219,29 +252,57 @@ def E_x(m_opts, m_vars):
     return E_x
 
 def predict(m_opts, m_vars, X, break_chunks=1):
-    if break_chunks == 1:
-        # sigmoid = lambda x: 1/(1+np.exp(-x))
-        U = X.dot(m_vars['W'].T)
-        Y_pred = U.dot(m_vars['V'].T)
-        # Y_pred = np.clip(Y_pred, -39, np.inf)
-        Y_pred = sigmoid(Y_pred)
-        Y_pred = Y_pred*m_vars['mu']
-        return Y_pred
-    else:
-        U = ssp.csr_matrix(X.dot(m_vars['W'].T))
-        n_users_test = m_vars['Y_test'].shape[0]
-        chunk_size = n_users_test//break_chunks
+    if break_chunks != 1:
+        print "Warning, break_chunks no longer supported in predict."
+    # sigmoid = lambda x: 1/(1+np.exp(-x))
+    U = X.dot(m_vars['W'].T)
+    Y_pred = U.dot(m_vars['V'].T)
+    # Y_pred = np.clip(Y_pred, -39, np.inf)
+    Y_pred = sigmoid(Y_pred)
+    Y_pred = Y_pred*m_vars['mu']
+    return Y_pred
 
-        start_idx = range(0,n_users_test,chunk_size)[:break_chunks]
-        end_idx = start_idx[1:] + [n_users_test]
+def predictPrecision(m_opts, m_vars, X, k=5, break_chunks=2):
+    U = ssp.csr_matrix(X.dot(m_vars['W'].T))
+    n_users_test = m_vars['Y_test'].shape[0]
+    chunk_size = n_users_test//break_chunks
 
-        Y_predict_chunks = [None]*break_chunks
-        Y_test_chunks = [None]*break_chunks
-        for i,(lo,hi) in enumerate(zip(start_idx,end_idx)):
-            Y_predict_chunks[i] = np.asarray(U[lo:hi].dot(m_vars['V'].T))
-            Y_predict_chunks[i] = m_vars['mu']*sigmoid(Y_predict_chunks[i])
-            Y_test_chunks[i] = m_vars['Y_test'][lo:hi]
-        return Y_predict_chunks,Y_test_chunks
+    start_idx = range(0,n_users_test,chunk_size)[:break_chunks]
+    end_idx = start_idx[1:] + [n_users_test]
+
+    p = np.zeros((break_chunks,k))
+    n_total_items = 0
+    n_labels = 0
+    # Y_predict_chunks = [None]*break_chunks
+    # Y_test_chunks = [None]*break_chunks
+    Y_predict_chunk = None
+    Y_test_chunk = None
+    print "Chunk #",
+    for i,(lo,hi) in enumerate(zip(start_idx,end_idx)):
+        print i,
+        Y_pred_chunk = np.asarray(U[lo:hi].dot(m_vars['V'].T))
+        Y_pred_chunk = m_vars['mu']*sigmoid(Y_pred_chunk)
+        # Y_true_chunk = m_vars['Y_test'][lo:hi]
+
+        prevMatch = 0
+        # print "Computing %dth precision"%i
+        Y_pred = Y_pred_chunk.copy()
+        Y_true = m_vars['Y_test'][lo:hi].copy()
+        n_items, n_labels = Y_pred.shape
+        n_total_items += n_items
+        for t in xrange(1,k+1):
+            Jidx = np.argmax(Y_pred,1)
+            prevMatch += Y_true[np.arange(n_items),Jidx].sum()
+            Y_pred[np.arange(n_items),Jidx] = -np.inf
+            p[i,t-1] = prevMatch #/(t*n_items)
+    print "Done"
+
+    q = np.zeros(k)
+    # print "q:",
+    for i in range(1,k+1):
+        q[i-1] = p[:,i-1].sum()/(i*n_total_items)
+
+    return tuple(q[[0,2,4]])
 
 def saver(vars_path, m_vars, opts_path, m_opts):
     import pickle

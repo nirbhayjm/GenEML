@@ -1,11 +1,13 @@
 import numpy as np
-from model import initialize,update,saver,predict
+from model import initialize,update,saver,predict,predictPrecision
 from ops import normalize,sparsify,shuffle
 from inputs import argparser
 from evaluation import *
 
 import time
 import os
+
+np.seterr("raise")
 
 if __name__ == '__main__':
     m_opts = argparser()
@@ -86,8 +88,9 @@ if __name__ == '__main__':
                     p_scores = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
                     # nDCG_scores = nDCG_k(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
                 else:
-                    Y_pred_chunks, Y_test_chunks = predict(m_opts,m_vars,m_vars['X_test'],m_opts['test_chunks'])
-                    p_scores = precisionAtKChunks(Y_pred_chunks, Y_test_chunks, m_opts['performance_k'])
+                    # Y_pred_chunks, Y_test_chunks = predict(m_opts,m_vars,m_vars['X_test'],m_opts['test_chunks'])
+                    # p_scores = precisionAtKChunks(Y_pred_chunks, Y_test_chunks, m_opts['performance_k'])
+                    p_scores = predictPrecision(m_opts, m_vars, m_vars['X_test'], k=5, break_chunks=m_opts['test_chunks'])
 
                 test_time = time.time() - start_test_t
                 
