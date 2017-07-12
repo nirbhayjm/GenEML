@@ -72,7 +72,7 @@ if __name__ == '__main__':
             if display_flag:
 
                 # Train precision
-                Y_train_pred = predict(m_opts,m_vars,m_vars['X_batch'])
+                Y_train_pred,_ = predict(m_opts,m_vars,m_vars['X_batch'])
                 p_scores = precisionAtK(Y_train_pred, m_vars['Y_batch'], m_opts['performance_k'])
                 if m_opts['verbose']:
                     print "Train score:",
@@ -84,21 +84,27 @@ if __name__ == '__main__':
                 # Test precision computation goes here
                 start_test_t = time.time()
                 if m_opts['test_chunks'] == 1:
-                    Y_pred = predict(m_opts,m_vars,m_vars['X_test'])
+                    Y_pred, Y_pred_2 = predict(m_opts,m_vars,m_vars['X_test'])
                     p_scores = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
+                    p_scores_2 = precisionAtK(Y_pred_2, m_vars['Y_test'], m_opts['performance_k'])
                     # nDCG_scores = nDCG_k(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
                 else:
                     # Y_pred_chunks, Y_test_chunks = predict(m_opts,m_vars,m_vars['X_test'],m_opts['test_chunks'])
                     # p_scores = precisionAtKChunks(Y_pred_chunks, Y_test_chunks, m_opts['performance_k'])
-                    p_scores = predictPrecision(m_opts, m_vars, m_vars['X_test'], k=5, break_chunks=m_opts['test_chunks'])
+                    p_scores,p_scores_2 = predictPrecision(m_opts, m_vars, m_vars['X_test'], k=5, break_chunks=m_opts['test_chunks'])
 
                 test_time = time.time() - start_test_t
                 
                 if m_opts['verbose']:
-                    print "Test score:",
+                    print "Test score w/  mu:",
                     for i in p_scores:
                         print " %0.4f "%i,
+                    if m_opts['observance']:
+                        print "\nTest score w/o mu:",
+                        for i in p_scores_2:
+                            print " %0.4f "%i,
                     print "\t (%.3f seconds)"%test_time
+
                     # print "Test nDCG score:",
                     # for i in nDCG_scores:
                     #     print " %0.4f "%i,

@@ -72,29 +72,6 @@ def update(m_opts, m_vars):
     if m_opts['observance']:
         update_observance(m_opts, m_vars)
     update_W(m_opts, m_vars)
-
-    # '''Monitoring the size of model variables'''
-    # import sys
-
-    # def mysize(obj):
-    #     if "nbytes" in dir(obj):
-    #         return obj.nbytes
-    #     elif "size" in dir(obj):
-    #         return obj.size*8 # Assuming 8 bytes per unit (float64, int64)
-    #     elif type(obj) is list:
-    #         size = 0
-    #         for item in obj:
-    #             size += mysize(item)
-    #         return size
-    #     else:
-    #         return sys.getsizeof(obj)
-
-    # for var_name in m_vars:
-    #     var_size = mysize(m_vars[var_name])
-    #     if var_size > 1e6:
-    #         print "[",var_name,":","%g MB"%((1.0*var_size)/(1024*1024)),"], "
-    # '''END'''
-
     return m_vars
 
 def update_U(m_opts, m_vars):
@@ -259,8 +236,8 @@ def predict(m_opts, m_vars, X, break_chunks=1):
     Y_pred = U.dot(m_vars['V'].T)
     # Y_pred = np.clip(Y_pred, -39, np.inf)
     Y_pred = sigmoid(Y_pred)
-    Y_pred = Y_pred*m_vars['mu']
-    return Y_pred
+    Y_pred_1 = Y_pred*m_vars['mu']
+    return Y_pred_1, Y_pred
 
 def predictPrecision(m_opts, m_vars, X, k=5, break_chunks=2):
     U = ssp.csr_matrix(X.dot(m_vars['W'].T))
@@ -270,7 +247,8 @@ def predictPrecision(m_opts, m_vars, X, k=5, break_chunks=2):
     start_idx = range(0,n_users_test,chunk_size)[:break_chunks]
     end_idx = start_idx[1:] + [n_users_test]
 
-    p = np.zeros((break_chunks,k))
+    p_1 = np.zeros((break_chunks,k))
+    p_2 = np.zeros((break_chunks,k))
     n_total_items = 0
     n_labels = 0
     # Y_predict_chunks = [None]*break_chunks
@@ -281,28 +259,38 @@ def predictPrecision(m_opts, m_vars, X, k=5, break_chunks=2):
     for i,(lo,hi) in enumerate(zip(start_idx,end_idx)):
         print i,
         Y_pred_chunk = np.asarray(U[lo:hi].dot(m_vars['V'].T))
-        Y_pred_chunk = m_vars['mu']*sigmoid(Y_pred_chunk)
+        Y_pred_chunk_2 = sigmoid(Y_pred_chunk)
+        Y_pred_chunk_1 = m_vars['mu']*Y_pred_chunk_2
         # Y_true_chunk = m_vars['Y_test'][lo:hi]
 
-        prevMatch = 0
+        prevMatch_1 = 0
+        prevMatch_2 = 0
         # print "Computing %dth precision"%i
-        Y_pred = Y_pred_chunk.copy()
+        Y_pred_1 = Y_pred_chunk_1.copy()
+        Y_pred_2 = Y_pred_chunk_2.copy()
         Y_true = m_vars['Y_test'][lo:hi].copy()
-        n_items, n_labels = Y_pred.shape
+        n_items, n_labels = Y_pred_1.shape
         n_total_items += n_items
         for t in xrange(1,k+1):
-            Jidx = np.argmax(Y_pred,1)
-            prevMatch += Y_true[np.arange(n_items),Jidx].sum()
-            Y_pred[np.arange(n_items),Jidx] = -np.inf
-            p[i,t-1] = prevMatch #/(t*n_items)
+            Jidx_1 = np.argmax(Y_pred_1,1)
+            prevMatch_1 += Y_true[np.arange(n_items),Jidx_1].sum()
+            Y_pred_1[np.arange(n_items),Jidx_1] = -np.inf
+            p_1[i,t-1] = prevMatch_1 #/(t*n_items)
+
+            Jidx_2 = np.argmax(Y_pred_2,1)
+            prevMatch_2 += Y_true[np.arange(n_items),Jidx_2].sum()
+            Y_pred_2[np.arange(n_items),Jidx_2] = -np.inf
+            p_2[i,t-1] = prevMatch_2 #/(t*n_items)
     print "Done"
 
-    q = np.zeros(k)
+    q_1 = np.zeros(k)
+    q_2 = np.zeros(k)
     # print "q:",
     for i in range(1,k+1):
-        q[i-1] = p[:,i-1].sum()/(i*n_total_items)
+        q_1[i-1] = p_1[:,i-1].sum()/(i*n_total_items)
+        q_2[i-1] = p_2[:,i-1].sum()/(i*n_total_items)
 
-    return tuple(q[[0,2,4]])
+    return tuple(q_1[[0,2,4]]),tuple(q_2[[0,2,4]])
 
 def saver(vars_path, m_vars, opts_path, m_opts):
     import pickle
