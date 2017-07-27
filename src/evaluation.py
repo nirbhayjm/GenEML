@@ -43,14 +43,9 @@ def precisionAtKChunks(Y_pred_orig, Y_true_orig, k,verbose=True):
             p[c,i-1] = prevMatch #/(i*n_items)
 
     q = np.zeros(k)
-    # print "q:",
     for i in range(1,k+1):
         q[i-1] = p[:,i-1].sum()/(i*n_total_items)
 
-    # if verbose:
-    #     for i in q[[0,2,4]]:
-    #         print " %0.4f "%i,
-    #     print ""
     return tuple(q[[0,2,4]])
 
 def DCG_k(Y_pred_orig, Y_true_orig, k, verbose=False):
@@ -79,12 +74,6 @@ def nDCG_k(Y_pred, Y_true, k, verbose=False):
         IDCG_k_score = DCG_k(Y_true, Y_true, k)
 
     p = DCG_k_score/IDCG_k_score
-    # p = DCG_k_score
-
-    # if verbose:
-    #     for i in p[[0,2,4]]:
-    #         print " %0.4f"%(i),
-    #     print ""
     return tuple(p[[0,2,4]])
 
 def AUC(Y_pred, Y_true):
@@ -102,3 +91,4 @@ def AUC(Y_pred, Y_true):
     if ssp.issparse(Y_pred):
         Y_pred = Y_pred.todense()
     return roc_auc_score(Y_true, Y_pred)
+    

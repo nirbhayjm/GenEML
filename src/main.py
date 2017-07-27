@@ -7,7 +7,7 @@ from evaluation import *
 import time
 import os
 
-np.seterr("raise")
+np.seterr("raise") # To stop execution on overflow warnings
 
 if __name__ == '__main__':
     m_opts = argparser()
@@ -17,8 +17,9 @@ if __name__ == '__main__':
     print "Initializing model..."
     m_vars = initialize(m_opts)
     print "Model initialized, beginning training."
-    # print m_vars
     
+    # Setting up batch sized ranges of data. The last batch with size less 
+    # than 'batch_size' is ignored, but only for the current epoch.
     iter_idx = -1
     start_idx = range(0, m_vars['n_users'], m_opts['batch_size'])
     end_idx = start_idx[1:]
@@ -26,14 +27,14 @@ if __name__ == '__main__':
     minibatch_count = m_vars['n_users']//m_opts['batch_size']
     if minibatch_count == len(start_idx):
         end_idx.append(m_vars['n_users'])
-    lr = m_opts['lr_alpha']*(1.0 + np.arange(minibatch_count*m_opts['num_epochs']))**(-m_opts['lr_tau'])
+
+    # Learning rate 'lr' is a geometric series decay
+    lr = m_opts['lr_alpha']*(1.0 + np.arange(minibatch_count*\
+                    m_opts['num_epochs']))**(-m_opts['lr_tau'])
+    # Uncomment the following to set hard limits on the learning rate
     # lr = np.clip(minibatch_count*m_opts['lr_alpha']*lr,1e-10,0.9)
-    # print "Initial gammas:",lr[:10]
 
-    # print minibatch_count
-    # print start_idx, end_idx
-
-    if m_opts['save']:
+    if m_opts['save']: # Creating checkpoints directory
         os.system('mkdir -p checkpoints/'+m_opts['name']+'/')
 
     for epoch_idx in range(m_opts['num_epochs']):
@@ -44,7 +45,8 @@ if __name__ == '__main__':
 
         if m_opts['shuffle_minibatches']:
             # shuffle(m_vars['Y_train'],m_vars['X_train'],m_vars['U'],random_state=m_opts['random_state']+epoch_idx)
-            shuffle(m_vars['Y_train'],m_vars['X_train'],random_state=m_opts['random_state']+epoch_idx)
+            shuffle(m_vars['Y_train'],m_vars['X_train'],
+                    random_state=m_opts['random_state']+epoch_idx)
 
         for minibatch_idx in range(minibatch_count):
             iter_idx += 1
@@ -60,18 +62,18 @@ if __name__ == '__main__':
             m_vars['gamma'] = lr[iter_idx]
 
             print "Iter:",iter_idx,
-            print "\tGamma: %6g"%m_vars['gamma'],
+            # Gamma : learning rate at current time step
+            print "\tGamma: %6g"%m_vars['gamma'], 
             print "\tUpdate Time: %.3f seconds"%update_time
 
-            # Updates go here
+            # Updates
             start_iter_t = time.time()
             m_vars = update(m_opts, m_vars)
-            # m_vars['U'][lo:hi] = m_vars['U_batch'] #copying updated user factors of minibatch to global user factor matrix
+            # Copying updated user factors of minibatch to global user factor matrix
+            # m_vars['U'][lo:hi] = m_vars['U_batch'] 
             update_time = time.time() - start_iter_t
 
-            if display_flag:
-
-                # Train precision
+            if display_flag: # Train precision
                 Y_train_pred,_ = predict(m_opts,m_vars,m_vars['X_batch'])
                 p_scores = precisionAtK(Y_train_pred, m_vars['Y_batch'], m_opts['performance_k'])
                 if m_opts['verbose']:
@@ -80,10 +82,14 @@ if __name__ == '__main__':
                         print " %0.4f"%i,
                     print ""
 
-            if test_flag:
-                # Test precision computation goes here
+            if test_flag: # Test precision
                 start_test_t = time.time()
                 if m_opts['test_chunks'] == 1:
+                    '''
+                    For memory effecient testing, 'test_chunks' breaks the test data into 
+                    parts and computes the precision scores aggregates for each chunk 
+                    separately; maximum memory usage is bounded by the size of each chunk.
+                    '''
                     Y_pred, Y_pred_2 = predict(m_opts,m_vars,m_vars['X_test'])
                     p_scores = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
                     p_scores_2 = precisionAtK(Y_pred_2, m_vars['Y_test'], m_opts['performance_k'])
@@ -91,8 +97,8 @@ if __name__ == '__main__':
                 else:
                     # Y_pred_chunks, Y_test_chunks = predict(m_opts,m_vars,m_vars['X_test'],m_opts['test_chunks'])
                     # p_scores = precisionAtKChunks(Y_pred_chunks, Y_test_chunks, m_opts['performance_k'])
-                    p_scores,p_scores_2 = predictPrecision(m_opts, m_vars, m_vars['X_test'], k=5, break_chunks=m_opts['test_chunks'])
-
+                    p_scores,p_scores_2 = predictPrecision(m_opts, m_vars, m_vars['X_test'], k=5, 
+                                                            break_chunks=m_opts['test_chunks'])
                 test_time = time.time() - start_test_t
                 
                 if m_opts['verbose']:
@@ -105,6 +111,7 @@ if __name__ == '__main__':
                             print " %0.4f "%i,
                     print "\t (%.3f seconds)"%test_time
 
+                    # Uncomment to display normalized DCG scores
                     # print "Test nDCG score:",
                     # for i in nDCG_scores:
                     #     print " %0.4f "%i,
@@ -114,7 +121,7 @@ if __name__ == '__main__':
 
         print('Epoch time=%.2f'% (time.time() - start_epoch_t))
 
-        # Saving at the end of each epoch goes here.
+        # Saving at the end of each epoch.
         if m_opts['save']:
             save_path = 'checkpoints/'+m_opts['name']+'/'\
                         +str(epoch_idx)+"_"\
