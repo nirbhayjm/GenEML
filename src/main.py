@@ -44,7 +44,6 @@ if __name__ == '__main__':
         test_time = 0
 
         if m_opts['shuffle_minibatches']:
-            # shuffle(m_vars['Y_train'],m_vars['X_train'],m_vars['U'],random_state=m_opts['random_state']+epoch_idx)
             shuffle(m_vars['Y_train'],m_vars['X_train'],
                     random_state=m_opts['random_state']+epoch_idx)
 
@@ -69,8 +68,6 @@ if __name__ == '__main__':
             # Updates
             start_iter_t = time.time()
             m_vars = update(m_opts, m_vars)
-            # Copying updated user factors of minibatch to global user factor matrix
-            # m_vars['U'][lo:hi] = m_vars['U_batch'] 
             update_time = time.time() - start_iter_t
 
             if display_flag: # Train precision
@@ -93,10 +90,7 @@ if __name__ == '__main__':
                     Y_pred, Y_pred_2 = predict(m_opts,m_vars,m_vars['X_test'])
                     p_scores = precisionAtK(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
                     p_scores_2 = precisionAtK(Y_pred_2, m_vars['Y_test'], m_opts['performance_k'])
-                    # nDCG_scores = nDCG_k(Y_pred, m_vars['Y_test'], m_opts['performance_k'])
                 else:
-                    # Y_pred_chunks, Y_test_chunks = predict(m_opts,m_vars,m_vars['X_test'],m_opts['test_chunks'])
-                    # p_scores = precisionAtKChunks(Y_pred_chunks, Y_test_chunks, m_opts['performance_k'])
                     p_scores,p_scores_2 = predictPrecision(m_opts, m_vars, m_vars['X_test'], k=5, 
                                                             break_chunks=m_opts['test_chunks'])
                 test_time = time.time() - start_test_t
@@ -110,14 +104,6 @@ if __name__ == '__main__':
                         for i in p_scores_2:
                             print " %0.4f "%i,
                     print "\t (%.3f seconds)"%test_time
-
-                    # Uncomment to display normalized DCG scores
-                    # print "Test nDCG score:",
-                    # for i in nDCG_scores:
-                    #     print " %0.4f "%i,
-                    # print ""
-                # m_vars['performance']['prec@k'].append(p_scores)
-                # m_vars['performance']['ndcg@k'].append(nDCG_scores)
 
         print('Epoch time=%.2f'% (time.time() - start_epoch_t))
 

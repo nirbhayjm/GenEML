@@ -51,7 +51,6 @@ def precisionAtKChunks(Y_pred_orig, Y_true_orig, k,verbose=True):
 def DCG_k(Y_pred_orig, Y_true_orig, k, verbose=False):
     Y_pred = np.asarray(Y_pred_orig.copy())
     Y_true = Y_true_orig.copy()
-    # print ssp.csr_matrix(Y_true).todense().shape()
     p = np.zeros(k)
     assert Y_pred.shape == Y_true.shape,\
         "Shape mismatch:"+str(Y_pred.shape)+str(Y_true.shape)

@@ -16,8 +16,6 @@ def initialize(m_opts):
     data = loadmat(m_opts['dataset'])
     print "Dataset loaded: ",m_opts['dataset']
 
-    # m_vars['Y_train'] = data['Y_tr']
-    # m_vars['X_train'] = data['X_tr']
     m_vars['Y_train'] = sparsify(data['Y_tr'])
     m_vars['X_train'] = sparsify(data['X_tr'])
     m_vars['Y_test'] = sparsify(data['Y_te'])
@@ -42,27 +40,24 @@ def initialize(m_opts):
     m_vars['W'] = m_opts['init_w']*np.random.randn(m_opts['n_components'],m_vars['n_features']).astype(floatX)
 
     # accumulator of sufficient statistics of label factors
-    # m_vars['sigma_v'] = np.zeros((m_vars['n_labels'], m_opts['n_components'], m_opts['n_components']))
     m_vars['sigma_v'] = [None]*m_vars['n_labels']
     for i in range(m_vars['n_labels']):
-        # m_vars['sigma_v'][i] = m_opts['lam_v']*np.eye(m_opts['n_components'])
         m_vars['sigma_v'][i] = m_opts['lam_v']*ssp.eye(m_opts['n_components'],format="csr")
     m_vars['x_v'] = np.zeros((m_vars['n_labels'], m_opts['n_components']))
 
     if not m_opts['use_grad']:
         # accumulator of sufficient statistics of W matrix
         m_vars['sigma_W'] = m_opts['lam_w']*ssp.eye(m_vars['n_features'], m_vars['n_features'], format="csr")
-        # m_vars['sigma_W'] = m_opts['lam_w']*np.eye(m_vars['n_features'])
         m_vars['x_W'] = np.zeros((m_vars['n_features'], m_opts['n_components']))
 
     if m_opts['observance']:
         m_vars['a'],m_vars['b'] = m_opts['init_mu_a'],m_opts['init_mu_b']
-        m_vars['mu'] = np.random.beta(m_vars['a'],m_vars['b'],size=(m_vars['n_labels']) ) #, dtype=floatX)
+        # Beta random initialization
+        m_vars['mu'] = np.random.beta(m_vars['a'],m_vars['b'],size=(m_vars['n_labels']))
+        # constant initialization
         # m_vars['mu'] = m_opts['init_mu']*np.ones(m_vars['n_labels']).astype(floatX)
     else:
         m_vars['mu'] = np.ones(m_vars['n_labels']).astype(floatX)
-
-    # m_vars['performance'] = {'prec@k':[], 'dcg@k':[], 'ndcg@k':[]} # storing the performance measures along iterations
 
     return m_vars
 
@@ -87,8 +82,6 @@ def update_U(m_opts, m_vars):
         
             sigma = m_vars['V'].T.dot(PN_i*m_vars['V']) + m_opts['lam_u']*np.eye(m_opts['n_components'])
             x = m_vars['V'].T.dot(PK_i) + np.asarray((m_opts['lam_u']*m_vars['W']).dot(m_vars['X_batch'][i].todense().T)).reshape(-1)
-            # z = np.asarray(z).reshape(-1)
-            # x = y+z
             m_vars['U_batch'][i] = linalg.solve(sigma, x)
 
 def update_V(m_opts, m_vars):
@@ -157,7 +150,6 @@ def update_W(m_opts, m_vars):
                 for iter_idx in range(m_opts['cg_iters']*10):
                     grad = m_vars['X_batch_T'].dot(m_vars['X_batch'].dot(m_vars['W'].T) - m_vars['U_batch'])
                     grad = lr[iter_idx]*(grad.T + m_opts['lam_w']*m_vars['W'])
-                    # m_vars['W'] = m_vars['W'] - np.clip(grad,-1e6,1e6)
                     tail_norm = 0.5*curr_norm + (1-0.5)*tail_norm
                     curr_norm = l2_norm(grad)
                     if curr_norm < 1e-15:
@@ -167,27 +159,17 @@ def update_W(m_opts, m_vars):
                         lr = lr/2.0
 
                     m_vars['W'] = m_vars['W'] - clip_by_norm(grad, 1e0) # Clip by norm
-                    # print "[%d]grad_avg:%g"%(iter_idx,np.abs(grad).sum()/grad.size)
-                    # print "[%d]grad_l2_norm:%g"%(iter_idx,curr_norm)
 
-                # Delta_W = np.abs(m_vars['W']-W_old).sum()/W_old.size
                 Delta_W = l2_norm(m_vars['W']-W_old)
-                # print "Delta_W:%g"%Delta_W
             except FloatingPointError:
                 print "FloatingPointError in:"
                 print grad
                 assert False
         
 def E_x_omega_row(m_opts, m_vars):
-    # sigmoid = lambda x: 1/(1+np.exp(-x))
-    # PSI = m_vars['U_batch'][row_no].dot(m_vars['V'].T)
     PSI = m_vars['U_batch'].dot(m_vars['V'].T)
     E_omega = 0.5*np.tanh(0.5*PSI)/(EPS+PSI)
-    # PSI = -PSI
-    # PSI = np.clip(PSI, -39, np.inf)
     PSI_sigmoid = sigmoid(-PSI)
-    # print "mu shape:",m_vars['mu'].shape
-    # print "PSI_sigmoid shape:",PSI_sigmoid.shape
     E_x = (m_vars['mu']*PSI_sigmoid)/(EPS+m_vars['mu']*PSI_sigmoid+(1.-m_vars['mu']))
 
     E_x[m_vars['Y_batch'].nonzero()] = 1.
@@ -198,31 +180,20 @@ def PG_row(m_opts, m_vars):
     return np.array(PG) #.reshape(-1)
 
 def E_x_omega_col(m_opts, m_vars):
-    # sigmoid = lambda x: 1/(1+np.exp(-x))
     PSI = m_vars['V'].dot(m_vars['U_batch'].T)
     E_omega = 0.5*np.tanh(0.5*PSI)/(EPS+PSI)
-    # PSI = -PSI
-    # PSI = np.clip(PSI, -39, np.inf)
     PSI_sigmoid = sigmoid(-PSI)
-    # E_x = (m_vars['mu'][col_no]*PSI_sigmoid)/(EPS+m_vars['mu'][col_no]*PSI_sigmoid+(1.-m_vars['mu'][col_no]))
-    # print "mu shape:",m_vars['mu'].shape
-    # print "PSI_sigmoid shape:",PSI_sigmoid.shape
     mu_temp = m_vars['mu'][:,np.newaxis]
     E_x = (mu_temp*PSI_sigmoid)/(EPS+mu_temp*PSI_sigmoid+(1.-mu_temp))
-
     E_x[m_vars['Y_batch_T'].nonzero()] = 1.
     return E_x, E_omega
 
 def PG_col(m_opts, m_vars):
-    # PG = m_vars['Y_batch'][:,col_no].todense()-0.5
     PG = m_vars['Y_batch_T'].todense()-0.5
     return np.array(PG)
 
 def E_x(m_opts, m_vars):
-    # sigmoid = lambda x: 1/(1+np.exp(-x))
     PSI = m_vars['U_batch'].dot(m_vars['V'].T)
-    # PSI = -PSI
-    # PSI = np.clip(PSI, -39, np.inf)
     PSI_sigmoid = sigmoid(-PSI)
     E_x = (m_vars['mu']*PSI_sigmoid)/(EPS+m_vars['mu']*PSI_sigmoid+(1.-m_vars['mu']))
     E_x[m_vars['Y_batch'].nonzero()] = 1.
@@ -231,10 +202,8 @@ def E_x(m_opts, m_vars):
 def predict(m_opts, m_vars, X, break_chunks=1):
     if break_chunks != 1:
         print "Warning, break_chunks no longer supported in predict."
-    # sigmoid = lambda x: 1/(1+np.exp(-x))
     U = X.dot(m_vars['W'].T)
     Y_pred = U.dot(m_vars['V'].T)
-    # Y_pred = np.clip(Y_pred, -39, np.inf)
     Y_pred = sigmoid(Y_pred)
     Y_pred_1 = Y_pred*m_vars['mu']
     return Y_pred_1, Y_pred
@@ -251,8 +220,6 @@ def predictPrecision(m_opts, m_vars, X, k=5, break_chunks=2):
     p_2 = np.zeros((break_chunks,k))
     n_total_items = 0
     n_labels = 0
-    # Y_predict_chunks = [None]*break_chunks
-    # Y_test_chunks = [None]*break_chunks
     Y_predict_chunk = None
     Y_test_chunk = None
     print "Chunk #",
@@ -261,11 +228,9 @@ def predictPrecision(m_opts, m_vars, X, k=5, break_chunks=2):
         Y_pred_chunk = np.asarray(U[lo:hi].dot(m_vars['V'].T))
         Y_pred_chunk_2 = sigmoid(Y_pred_chunk)
         Y_pred_chunk_1 = m_vars['mu']*Y_pred_chunk_2
-        # Y_true_chunk = m_vars['Y_test'][lo:hi]
 
         prevMatch_1 = 0
         prevMatch_2 = 0
-        # print "Computing %dth precision"%i
         Y_pred_1 = Y_pred_chunk_1.copy()
         Y_pred_2 = Y_pred_chunk_2.copy()
         Y_true = m_vars['Y_test'][lo:hi].copy()
@@ -285,7 +250,6 @@ def predictPrecision(m_opts, m_vars, X, k=5, break_chunks=2):
 
     q_1 = np.zeros(k)
     q_2 = np.zeros(k)
-    # print "q:",
     for i in range(1,k+1):
         q_1[i-1] = p_1[:,i-1].sum()/(i*n_total_items)
         q_2[i-1] = p_2[:,i-1].sum()/(i*n_total_items)
